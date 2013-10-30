@@ -29,7 +29,7 @@ def guessColumnType( cg, cs ):
 """
     if cg==ColType.TEXT:
         return ColType.TEXT
-    if len( cs ) == 0:
+    if cs==None or len( cs ) == 0:
         return cg   # empty cells don't affect current guess
     if cg==None or cg==ColType.INT:
         match = intRE.match( cs )
@@ -63,7 +63,7 @@ def genColumnIds( colHeaders ):
 def parseType( ct, vs): 
     """parse string vs to a Python value based on SQL type named ct
 """
-    if len(vs)==0 and ct!="text":
+    if vs==None or ( len(vs)==0 and ct!="text" ):
         return None
     if ct=="integer":
         # for now: drop all $ and , chars:
@@ -114,7 +114,7 @@ def loadCSVFile( dbName, csvFilePath, **fmtparams ):
     bnm = os.path.basename( csvFilePath )
     (tableName,_)= os.path.splitext( bnm )
     dbConn = sqlite3.connect(dbName)
-    with open(csvFilePath) as csvfile:
+    with open(csvFilePath,'rU') as csvfile:
         rd = csv.reader( csvfile, **fmtparams )
         headerRow = rd.next()
         colIdInfo = genColumnIds( headerRow )
