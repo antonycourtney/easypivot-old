@@ -31,7 +31,7 @@ def getDbConn( dbName ):
 def getTableInfo( dbConn, tableName ):
     """Use sqlite tableinfo pragma to retrieve metadata on the given table
     """
-    query = "pragma table_info(%s)" % tableName
+    query = 'pragma table_info("%s")' % tableName
     c = dbConn.execute( query )
     r = c.fetchall()
     return r
@@ -56,17 +56,17 @@ class PagedDbTable(object):
         super( PagedDbTable, self ).__init__()
         self.dbName = dbName
         self.dbTableName = dbTableName
-        query = "select count(*) from " + dbTableName
+        query = 'select count(*) from "' + dbTableName + '"'
         dbConn = getDbConn( dbName )
         c = dbConn.execute( query );
         self.totalRowCount = c.fetchone()[0]
-        self.baseQuery = "select * from " + dbTableName
+        self.baseQuery = 'select * from "' + dbTableName + '"'
         self.tableInfo = getTableInfo( dbConn, dbTableName )
         self.columnNames = map( lambda ti: ti[1], self.tableInfo )
         self.columnTypes = map( lambda ti: ti[2], self.tableInfo )
         # extract human-friendly descriptions from columnInfo companion table
-        cinfoTable = dbTableName + "_columnInfo"
-        c = dbConn.execute( "select description from " + cinfoTable)
+        qcinfoTable = '"' + dbTableName + '_columnInfo"'
+        c = dbConn.execute( "select description from " + qcinfoTable)
         rows = c.fetchall()
         self.columnDescs = map( lambda r:r[0], rows )
         self.columnInfo = []

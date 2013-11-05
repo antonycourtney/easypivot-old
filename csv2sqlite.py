@@ -81,7 +81,7 @@ def createColumnTable( dbConn, tableName, colIdInfo ):
     """Create a metadata table to retain descriptive column names
 """
     schemaStr = "('id' integer, 'colName' text, 'description' text)"
-    colTableName = tableName + "_columnInfo"
+    colTableName = '"' + tableName + "_columnInfo" + '"'
     dropStr = "DROP TABLE IF EXISTS " + colTableName
     dbConn.execute( dropStr )
     createStr = "CREATE TABLE " + colTableName + " " + schemaStr
@@ -129,13 +129,14 @@ def loadCSVFile( dbName, csvFilePath, **fmtparams ):
         # build up Schema string:
         typedCols = map( lambda cn, ct: "'" + cn + "' " + ct, colNames, colTypes )
         schemaStr = string.join( typedCols, ", " )
-        dropStr = "DROP TABLE IF EXISTS " + tableName
+        qtableName = '"' + tableName + '"'
+        dropStr = "DROP TABLE IF EXISTS " + qtableName
         dbConn.execute( dropStr )    
-        createStr = "CREATE TABLE " + tableName + " ( " + schemaStr + " )"
+        createStr = "CREATE TABLE " + qtableName + " ( " + schemaStr + " )"
         # print createStr
         dbConn.execute( createStr )
         qs = ['?'] * len(colNames)
-        insertStmt = "INSERT INTO " + tableName + " VALUES ( " + string.join( qs, ", " ) + " ) "
+        insertStmt = "INSERT INTO " + qtableName + " VALUES ( " + string.join( qs, ", " ) + " ) "
         for (i,row) in enumerate( rd ):
             rowVals = map( parseType, colTypes, row )
             # if i < 10:
