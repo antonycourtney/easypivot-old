@@ -110,6 +110,13 @@
       }, 50);
     }
 
+    function loadInitialImage( cbfn ) {
+      var url = "tables/" + tn;
+      req = $.get( url, 
+                   { startRow: 0, rowLimit: 50 },
+                   cbfn );
+
+    }
 
     function onError(fromPage, toPage) {
       alert("error loading pages " + fromPage + " to " + toPage);
@@ -162,6 +169,7 @@
       "ensureData": ensureData,
       "reloadData": reloadData,
       "setSort": setSort,
+      "loadInitialImage": loadInitialImage,
 
       // events
       "onDataLoading": onDataLoading,
@@ -170,10 +178,9 @@
   }
 
 
-  function CSVViewer( container, tableName )
+  function CSVViewer( container, loader )
   {
     var grid;
-    var loader = new CSVView.Data.RemoteModel( tableName );
 
     var options = {
       editable: false,
@@ -271,11 +278,6 @@
       $(container).css( 'width', gridWidth+'px' );
     };
 
-    var url = "tables/" + tableName;
-    req = $.get( url, 
-                { startRow: 0, rowLimit: 50 },
-                onInitialImage );
-
-    return req; // placeholder
+    loader.loadInitialImage( onInitialImage );
   };
 }(jQuery));
