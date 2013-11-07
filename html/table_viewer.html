@@ -25,10 +25,12 @@
 <script src="SlickGrid/lib/jquery.jsonp-2.4.min.js"></script>
 <script src="SlickGrid/slick.core.js"></script>
 <script src="SlickGrid/slick.grid.js"></script>
+<script src="http://d3js.org/d3.v3.min.js"></script>
 <script src="csvview.js"></script>
 <script>
   $(function () {
-    var loader = new CSVView.Data.RemoteModel( "${table_name}" );
+    // var loader = new CSVView.Data.RemoteModel( "${table_name}" );
+    var loader = new CSVView.Data.LocalModel( "${table_name}" );
     CSVView.View( "#myView", loader );
   });
 </script>

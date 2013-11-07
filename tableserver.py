@@ -153,7 +153,7 @@ config = {'/':
         }
 
 def open_page(tableName):
-    webbrowser.open("http://127.0.0.1:8080/table_viewer?table_name=" + tableName )
+    webbrowser.open_new("http://127.0.0.1:8080/table_viewer?table_name=" + tableName )
 
 class Root(object):
     def __init__( self, tables, table_viewer ):

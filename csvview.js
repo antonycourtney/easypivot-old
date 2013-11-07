@@ -4,7 +4,8 @@
     CSVView: {
       View: CSVViewer,
       Data: {
-        RemoteModel: RemoteModel 
+        RemoteModel: RemoteModel,
+        LocalModel: LocalModel 
       }
     }
   });
@@ -142,7 +143,6 @@
       onDataLoaded.notify({from: from, to: to});
     }
 
-
     function reloadData(from, to) {
       for (var i = from; i <= to; i++)
         delete data[i];
@@ -168,6 +168,124 @@
       "isDataLoaded": isDataLoaded,
       "ensureData": ensureData,
       "reloadData": reloadData,
+      "setSort": setSort,
+      "loadInitialImage": loadInitialImage,
+
+      // events
+      "onDataLoading": onDataLoading,
+      "onDataLoaded": onDataLoaded
+    };
+  }
+
+  function SimpleDataView() {
+    var rawData = [];
+
+    function getLength() {
+      return rawData.length;
+    }
+
+    function getItem(index) {
+      return rawData[index];
+    }
+
+    function setItems( items ) {
+      rawData = items;
+    }
+
+    function sort( cmpFn ) {
+      rawData.sort( cmpFn );
+    }
+
+    return {
+      "getLength": getLength,
+      "getItem": getItem,
+      "setItems": setItems,
+      "sort": sort,
+    };
+  }
+
+  /***
+   * A completely client-side data model based on d3's CSV parser.
+   */
+  function LocalModel( tn ) {
+    // private
+    var dataView = new SimpleDataView();
+    var table_name = tn;
+
+    // events
+    var onDataLoading = new Slick.Event();
+    var onDataLoaded = new Slick.Event();
+
+    function init() {
+    }
+
+    function isDataLoaded(from, to) {
+      return true;  // TODO: should return false before receiving initial image...
+    }
+
+    function clear() {
+      dataView.setItems([]);
+    }
+
+
+    function ensureData(from, to) {
+      // TODO: Should probably check for initial image not yet loaded
+      // onDataLoading.notify({from: from, to: to});
+      onDataLoaded.notify({from: from, to: to});
+    }
+
+    function loadInitialImage( cbfn ) {
+      var url = "csv/" + tn + ".csv";
+
+      function onGet( error, rows ) {
+        dataView.setItems( rows );
+        // construct columnInfo:
+        firstRow = rows[0];
+
+        var names = Object.getOwnPropertyNames( firstRow );
+
+        var columnInfo = names.map( function(nm) {
+          ci = { name: nm, field: nm };
+          return ci;
+        });
+
+        response = { columnInfo: columnInfo, results: rows };
+        cbfn( response );
+      }
+
+      d3.csv(url).get(onGet);
+    }
+
+
+    function reloadData(from, to) {
+    }
+
+
+    function setSort(column, dir) {
+      sortcol = column;
+      sortdir = dir;
+
+      var orderFn = ( dir > 0 ) ? d3.ascending : d3.descending;
+   
+      function cmpFn( ra, rb ) {
+        return orderFn( ra[ sortcol ], rb[ sortcol ]);
+      }
+
+      dataView.sort( cmpFn );
+      onDataLoaded.notify({from: 0, to: 50});  
+    }
+
+    init();
+
+    return {
+      // properties
+      "data": dataView,
+
+      // methods
+      "clear": clear,
+      "isDataLoaded": isDataLoaded,
+      "ensureData": ensureData,
+      // "reloadData": reloadData,
       "setSort": setSort,
       "loadInitialImage": loadInitialImage,
 
@@ -228,7 +346,8 @@
         grid.updateRowCount();
         grid.render();
 
-        loadingIndicator.fadeOut();
+        if (loadingIndicator)
+          loadingIndicator.fadeOut();
       });
 
       /*$(window).resize(function () {
