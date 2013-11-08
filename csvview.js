@@ -245,7 +245,7 @@
         var names = Object.getOwnPropertyNames( firstRow );
 
         var columnInfo = names.map( function(nm) {
-          ci = { name: nm, field: nm };
+          ci = { name: nm, field: nm, id: nm };
           return ci;
         });
 
@@ -272,7 +272,7 @@
       }
 
       dataView.sort( cmpFn );
-      onDataLoaded.notify({from: 0, to: 50});  
+      /* onDataLoaded.notify({from: 0, to: 50});  */
     }
 
     init();
@@ -319,6 +319,7 @@
       });
 
       grid.onSort.subscribe(function (e, args) {
+        grid.setSortColumn( args.sortCol.field, args.sortAsc );
         loader.setSort(args.sortCol.field, args.sortAsc ? 1 : -1);
         var vp = grid.getViewport();
         loader.ensureData(vp.top, vp.bottom);
