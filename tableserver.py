@@ -70,8 +70,8 @@ class PagedDbTable(object):
         rows = c.fetchall()
         self.columnDescs = map( lambda r:r[0], rows )
         self.columnInfo = []
-        for (cn,cd) in zip(self.columnNames,self.columnDescs):
-            cmap = { 'id': cn, 'field': cn, 'name': cd }
+        for (cn,cd,ct) in zip(self.columnNames,self.columnDescs,self.columnTypes):
+            cmap = { 'id': cn, 'field': cn, 'name': cd, 'type': ct }
             self.columnInfo.append( cmap )
         # print self.columnInfo
 
@@ -98,6 +98,19 @@ class PagedDbTable(object):
             viewRows.append( mappedRow )
 #        namedRows = map( lambda r: dict( zip( self.columnNames, r)), rows )
         return viewRows
+
+    def getRowData( self ):
+        """ Returns all row data as an array; does not attempt to interpret / format the data.
+        Returns data of array of arrays instead of as a dicionary keyed by column name. 
+        """
+        dbConn = getDbConn( self.dbName )
+        query = self.baseQuery
+        # print query
+        c = dbConn.execute( query )
+        rows = c.fetchall()
+        print " ==> ", len( rows ), " rows"
+        return rows
+
 
 #
 # N.B.:  We're still using a REST-ful (stateless) approach here, but doing so via the default() method.
@@ -163,6 +176,25 @@ class Root(object):
 def startWebServer( dbName, tableName ):
     root = Root( TableResource( dbName ), TableViewerResource() )
     dbTable = PagedDbTable( dbName, tableName )
+    cherrypy.config.update( {'log.screen': False })
+    cherrypy.engine.subscribe('start', lambda : open_page( tableName ) )
+    cherrypy.quickstart( root, '/', config)
+
+def dumpJSON( outFilePath, dbName, tableName ):
+    dt = PagedDbTable( dbName, tableName )
+    ci = dt.getColumnInfo()
+    rowData = dt.getRowData()
+    tableData = { 'columnInfo': ci, 'totalRowCount': dt.totalRowCount,  'rowData': rowData }
+    with open(outFilePath,'w') as outFile:
+        json.dump( tableData, outFile, indent=2, sort_keys=True )
+
+# simpler Root that serves no table data
+class TVRoot(object):
+    def __init__( self, table_viewer ):
+        self.table_viewer = table_viewer
+
+def serveJSONFile( tableName ):
+    root = TVRoot( TableViewerResource() )
     cherrypy.config.update( {'log.screen': False })
     cherrypy.engine.subscribe('start', lambda : open_page( tableName ) )
     cherrypy.quickstart( root, '/', config)

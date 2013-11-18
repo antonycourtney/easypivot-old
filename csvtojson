@@ -1,0 +1,25 @@
+#!/usr/bin/python
+"""
+Leverage 
+Simple CSV file viewer using slickgrid, sqlite and cherrypy
+"""
+
+import argparse
+
+
+import tableserver
+import csv2sqlite
+
+argParser = argparse.ArgumentParser(description='interactively view a CSV file in a local web browser')
+argParser.add_argument('--csvdelim', metavar='<delimiter>',type=str,nargs=1, help='delimiter character used in CSV file',
+    default=',')
+argParser.add_argument('csvfile',metavar='FILE',type=str, nargs=1, help='path to CSV file')
+argParser.add_argument('out', metavar='<outfile>',type=str,nargs=1, help='output file')
+args = argParser.parse_args()
+csvFilePath = args.csvfile[0]
+csvDelim = args.csvdelim[0]
+outFilePath = args.out[0]
+
+dbName = csv2sqlite.createTempDb()
+tableName = csv2sqlite.loadCSVFile( dbName, csvFilePath, delimiter=csvDelim )
+tableserver.dumpJSON( outFilePath, dbName, tableName ) 

@@ -209,12 +209,43 @@
    */
   function LocalModel( tn ) {
     // private
-    var dataView = new SimpleDataView();
+    var groupItemMetadataProvider = new Slick.Data.GroupItemMetadataProvider();    
+    var dataView = new Slick.Data.DataView( { groupItemMetadataProvider: groupItemMetadataProvider } );
     var table_name = tn;
 
     // events
     var onDataLoading = new Slick.Event();
     var onDataLoaded = new Slick.Event();
+
+    function setGrouping( columnInfo ) {
+        var aggs = [];
+
+        for( i = 0; i < columnInfo.length; i++ ) {
+          var ci = columnInfo[i];
+          if( ci.type=="integer" || ci.type=="real" ) {
+            aggs.push( new Slick.Data.Aggregators.Sum( ci.field ) );
+          }
+        }
+
+        dataView.setGrouping([ {
+        getter: "Union",
+        formatter: function (g) {
+          return "Union:  " + g.value + "  <span style='color:green'>(" + g.count + " items)</span>";
+        },
+        aggregators: aggs,
+        aggregateCollapsed: true,
+        collapsed: true
+      }, {
+        getter: "Job",
+        formatter: function (g) {
+          return "Job Family:  " + g.value + "  <span style='color:green'>(" + g.count + " items)</span>";
+        },
+        aggregators: aggs,
+        aggregateCollapsed: true,
+        collapsed: true
+      } ]
+      );
+    }
 
     function init() {
     }
@@ -234,32 +265,62 @@
       onDataLoaded.notify({from: from, to: to});
     }
 
+
+    var numRE = /[-+]?[$]?[0-9,]*\.?[0-9]+([eE][-+]?[0-9]+)?/;
+
     function loadInitialImage( cbfn ) {
-      var url = "csv/" + tn + ".csv";
+      var url = "json/" + tn + ".json";
 
-      function onGet( error, rows ) {
-        dataView.setItems( rows );
-        // construct columnInfo:
+      function onGet( error, data) {
+        console.log( data );
+        var columnInfo = data.columnInfo;
+
+        var columnNames = columnInfo.map(function (ci) { return ci.field; });
+
+        rows = [];
+        for( var i = 0; i < data.rowData.length; i++ ) {
+          rowArray = data.rowData[ i ];
+          rowDict = { 'id': "row_" + i }; 
+          for( var col = 0; col < rowArray.length; col++ ) {
+            rowDict[ columnNames[ col ] ] = rowArray[ col ];
+          }
+          rows[ i ] = rowDict;
+        }
+
         firstRow = rows[0];
-
-        var names = Object.getOwnPropertyNames( firstRow );
-
-        var columnInfo = names.map( function(nm) {
-          ci = { name: nm, field: nm, id: nm };
-          return ci;
-        });
-
+        console.log( firstRow );
+        dataView.setItems( rows );
+        setGrouping( columnInfo );
         response = { columnInfo: columnInfo, results: rows };
         cbfn( response );
       }
 
-      d3.csv(url).get(onGet);
+      d3.json(url, onGet);
     }
 
+    /*
+     * called after grid has been created to allow, e.g. registering
+     * plugins
+     */
+    function onGridInit(grid) {
+      // register the group item metadata provider to add expand/collapse group handlers
+      grid.registerPlugin(groupItemMetadataProvider);
+      // grid.setSelectionModel(new Slick.CellSelectionModel());   
+
+      // wire up model events to drive the grid
+      dataView.onRowCountChanged.subscribe(function (e, args) {
+        grid.updateRowCount();
+        grid.render();
+      });
+
+      dataView.onRowsChanged.subscribe(function (e, args) {
+        grid.invalidateRows(args.rows);
+        grid.render();
+      });         
+    } 
 
     function reloadData(from, to) {
     }
-
 
     function setSort(column, dir) {
       sortcol = column;
@@ -288,6 +349,7 @@
       // "reloadData": reloadData,
       "setSort": setSort,
       "loadInitialImage": loadInitialImage,
+      "onGridInit": onGridInit,
 
       // events
       "onDataLoading": onDataLoading,
@@ -308,10 +370,20 @@
 
     var loadingIndicator = null;
 
+    function sumTotalsFormatter(totals, columnDef) {
+      var val = totals.sum && totals.sum[columnDef.field];
+      if (val != null) {
+        return intFormatter( ((Math.round(parseFloat(val)*100)/100)) );
+      }
+      return "";
+    }
+
     /* Create a grid from the specified set of columns */
     function createGrid( columns ) 
     {
       grid = new Slick.Grid(container, loader.data, columns, options);
+
+      loader.onGridInit(grid);
 
       grid.onViewportChanged.subscribe(function (e, args) {
         var vp = grid.getViewport();
@@ -360,9 +432,11 @@
       grid.onViewportChanged.notify();
     };
 
+    var intFormatter = d3.format( ",d" );
+
     function onInitialImage( response ) {
       // let's approximate the column width:
-      var MINCOLWIDTH = 44;
+      var MINCOLWIDTH = 65;
       var MAXCOLWIDTH = 300;
       var GRIDWIDTHPAD = 16;
       var gridWidth = 0;  // initial padding amount
@@ -390,6 +464,15 @@
           // pad out last column to allow for dynamic scrollbar
           ci[i].width += GRIDWIDTHPAD;
         }
+        if (ci[i].type=='integer') {
+          ci[i].formatter = function ( r, c, v, cd, dc ) {
+            return intFormatter( v );
+          }
+          ci[i].groupTotalsFormatter = sumTotalsFormatter;          
+        } else if (ci[i].type=='real') {
+          ci[i].groupTotalsFormatter = sumTotalsFormatter;
+        }
+
         // console.log( "column ", i, " name: '", ci[i].name, "', width: ", ci[i].width );
         gridWidth += ci[i].width;
       }
