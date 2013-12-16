@@ -1,5 +1,5 @@
-(function ($) {
-  // Slick.Grid
+(function ($) {     
+  // CSVView.View, CSVView.Data    
   $.extend(true, window, {
     CSVView: {
       View: CSVViewer,

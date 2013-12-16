@@ -183,8 +183,23 @@ def startWebServer( dbName, tableName ):
 def dumpJSON( outFilePath, dbName, tableName ):
     dt = PagedDbTable( dbName, tableName )
     ci = dt.getColumnInfo()
+    # For now, let's just extract a schema from columnInfo stored format
+    columnMetadata = {}
+    for c in ci:
+        cEntry = { 'type': c['type'] }
+        if c['name']!=c['id']:
+            cEntry['displayName'] = c['name']
+        columnMetadata[ c['id'] ] = cEntry
+
+    # We call the column identifier 'id' instead of 'name' because current column info format uses 'name' for 'displayName'
+    columns = map( lambda c: c['id'], ci ); 
+    # schema = map( lambda c: { 'id': c['id'], 'type': c['type'] }, ci );
     rowData = dt.getRowData()
-    tableData = { 'columnInfo': ci, 'totalRowCount': dt.totalRowCount,  'rowData': rowData }
+    tableData = [ { 'fileFormatVersion': 1, 
+                    'columns': columns,
+                    'columnMetadata': columnMetadata, 
+                    'totalRowCount': dt.totalRowCount } , 
+                  { 'rowData': rowData } ]
     with open(outFilePath,'w') as outFile:
         json.dump( tableData, outFile, indent=2, sort_keys=True )
 
