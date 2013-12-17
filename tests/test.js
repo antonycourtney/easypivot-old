@@ -1,3 +1,31 @@
+
+asyncTest( "asyncTest: fetchURL tests", 1, function() {
+  var goodUrl = "../json/bart-comp-all.json";
+
+  var promise = RelTab.fetchURL( goodUrl );
+
+  promise.then( function( resp ) {
+      console.log( "promise success! Response: ", resp );
+      ok( resp.length == 2, "fetch good URL promise success" );
+      start();
+    }, function( error ) {
+      console.log( "promise failed.  Error: ", error );
+      start();
+    } );
+/*
+  var badUrl = "bad.json";
+  var promise2 = RelTab.fetchURL( badUrl );
+
+  promise2.then( function( resp ) {
+    console.log( "FAIL: unexpected success fetching bad URL" );
+    start();
+  }, function( error ) {
+    ok( true, "promise failed as expected for bad URL");
+    start();
+  } );
+*/
+});
+
 test( "hello test", function() {
   ok( 1 == "1", "Passed!" );
   ok( true, "Second subtest");
@@ -17,8 +45,17 @@ test("basic reltab functionality", function() {
   console.log( s2 );  
   ok( s2 == "x=30 and y='goodbye' and ( z>50 or a>'b' )", "filter with subexp and or: " + s2 );
 
-  function onGetSchema( error, schema ) {
-    console.log( "onGetSchema: ", error, schema );
+  // Create a promise error handler that will call start() to fail an asyncTest
+  function mkAsyncErrHandler( msg ) {
+    function handler( err ) {
+      console.log( msg, ": unexpected promise failure.  Error: ", err );
+      start();
+    }
+    return handler;
+  }
+
+  function onGetSchema( schema ) {
+    console.log( "onGetSchema: ", schema );
 
     var expectedCols = ["Name", "Title", "Base", "OT", "Other", "MDV", "ER", 
                       "EE", "DC", "Misc", "TCOE", "Source", "Job", "Union"];
@@ -56,11 +93,15 @@ test("basic reltab functionality", function() {
   var rt = RelTab.Local();
 
   asyncTest( "async test: getSchema", 2, function() {
-    rt.getSchema( q1, onGetSchema );
+
+    var sp = rt.getSchema( q1 );
+    sp.then( onGetSchema, mkAsyncErrHandler( "getSchema" ) );
+
   });
+
   // TODO: Maybe query result should be some kind of generator or stream instead
   // of [[]]
-
+/*
   function onQueryResult( error, res ) {
     console.log( "onQueryResult: ", error, res );
     console.log( "result length: ", res.length );
@@ -95,11 +136,12 @@ test("basic reltab functionality", function() {
 
     start();
   }
-
+*/
+/*
   asyncTest( "asyncTest: evalQuery q2", 2, function() {
     rt.evalQuery( q2, onQ2Result );
   });
-
+*/
 /*
   var q2 = q1.select( rf.And().gt("TCOE",200000).eq("Job Family","Transportation Operations") )
              .project( [ "Name", "Title", "TCOE", "Job Family" ] );

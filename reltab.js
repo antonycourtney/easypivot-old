@@ -7,9 +7,29 @@
       Filter: {
         And: createFilterAndExp,
         Or: createFilterOrExp
-      }
+      },
+      fetchURL: fetchURL
     } 
   });
+
+  /**
+   * Wrapper around d3.json using Q's Promises library:
+   */
+  function fetchURL( url ) {
+    var deferred = Q.defer();
+
+    function onLoad( err, data ) {
+      if( err )
+        deferred.reject( err );
+
+      deferred.resolve( data );
+    }
+
+    d3.json( url, onLoad );
+
+    return deferred.promise;
+  }
+
 
   /**
    * Enable construction of a RelTab Filter expression by operator chaining.
@@ -229,60 +249,39 @@
     }
 
     function ensureLoaded( tableName, cbfn ) {
-      var tcentry = tableCache[ tableName ];
+      // tableCache will map tableName to a Promise whose value is a TableRep
 
-      if ( tcentry ) {
-        if ( tcentry.status == "loaded" ) {
-          cbfn( null, tcentry.tableRep ); // cache hit
-        } else if ( tcentry.status == "pending" ) {
-          tcentry.callbacks.push( cbfn ); // just put ourselves on queue of callbacks
-        } else {
-          throw new Error( "unexpected table cache status: '" + tcentry.status + "'" );
-        }
-      } else {
+      var tcp = tableCache[ tableName ];
+      if( !tcp ) {
         var url = "../json/" + tableName + ".json";        
-        tcentry = { status: "pending", callbacks: [ cbfn ] };
-        tableCache[ tableName ] = tcentry;
 
-        // Callback invoked with raw JSON table data
-        function onLoad( error, tableData ) {
-          var tableRep = null;
+        // We'll use .then to construct a Promise that gives us a TableRep (not just the raw JSON) and store this
+        // in the tableCache:
 
-          console.log( "ensureLoaded:onLoad: ", error, tableData );
-          if( error ) {
-            console.log( "ensureLoaded error: ", error );
-            tcentry.status = "error";
-            tcentry.error = error;
-          } else {
-            tableRep = new TableRep( tableData );
-            tcentry.status = "loaded";
-            tcentry.tableRep = tableRep;
-          }
+        var rawJsonPromise = fetchURL( url );
 
-          for ( var i = 0; i < tcentry.callbacks.length; i++ ) {
-            tcentry.callbacks[i]( error, tableRep );
-          }
-          tcentry.callbacks = [];
-        }
+        tcp = rawJsonPromise.then( function( jsonData ) {
+          var trep = new TableRep( jsonData );
+          return trep;
+        })
 
-        console.log( "ensureLoaded: sending request for " + url );
-        d3.json( url, onLoad );
+        tableCache[ tableName ] = tcp;
+      } else {
+        console.log( "ensureLoaded: table '", tableName, "': cache hit!" );
       }
+      return tcp;
     }
 
     function TableRefImpl( inImpl, tableName ) {
 
-      function getSchema( cbfn ) {
+      function getSchema() {
 
-        function onLoad( error, table ) {
-          var s = null;
-          if( !error )
-            s = table.schema;
-
-          cbfn( error, s );
+        function onLoad( trep ) {
+          return trep.schema;
         }
 
-        ensureLoaded( tableName, onLoad );
+        var lp = ensureLoaded( tableName );
+        return lp.then( onLoad );
       }
 
       function evalQuery( cbfn ) {
@@ -412,10 +411,10 @@
       return opImpl;
     }
 
-    function getSchema(queryExp,cbfn) {
+    function getSchema( queryExp ) {
       var impl = getImpl( queryExp );
 
-      impl.getSchema( cbfn );
+      return impl.getSchema();
     }
 
     function evalQuery(queryExp,cbfn) {
