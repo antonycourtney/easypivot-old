@@ -230,7 +230,19 @@
         return md.type;
       }
 
-      return schemaData;  // for now
+      var columnIndices = {};
+      for ( var i = 0; i < schemaData.columns.length; i++ ) {
+        var col = schemaData.columns[ i ];
+        columnIndices[ col ] = i;
+      }
+
+      s.columnIndices = columnIndices;
+
+      s.columnIndex = function( colId ) {
+        return this.columnIndices[ colId ];
+      }
+
+      return s;  // for now
     }
 
     function TableRep( tableData ) {
@@ -254,6 +266,8 @@
       var tcp = tableCache[ tableName ];
       if( !tcp ) {
         var url = "../json/" + tableName + ".json";        
+
+        console.log( "ensureLoaded: table '", tableName, "': not in caching, loading URL." );
 
         // We'll use .then to construct a Promise that gives us a TableRep (not just the raw JSON) and store this
         // in the tableCache:
@@ -284,18 +298,15 @@
         return lp.then( onLoad );
       }
 
-      function evalQuery( cbfn ) {
-        function onLoad( error, table ) {
-          var rowData = null;
+      function evalQuery() {
 
-          if ( !error )
-            rowData = table.rowData;
-
-          cbfn( error, rowData );
+        function onLoad( trep ) {
+          return trep.rowData;
         }
 
-        ensureLoaded( tableName, onLoad );
+        var lp = ensureLoaded( tableName, onLoad );
 
+        return lp.then( onLoad );
       }
 
       return {
@@ -312,32 +323,60 @@
      *     that should happen whether operation is getSchema or evalQuery.
      */
     function ProjectImpl( inImpl, projectCols ) {
-      function getSchema( cbfn ) {
-        function onGetSchema( error, schema ) {
-          if (error) {
-            cbfn( err, null );
-            return;
-          }
-          // ensure all columns in projectCols in schema:
-          for ( var i = 0 ; i < projectCols.length; i++ ) {
-            var colId = projectCols[ i ];
-            if( !( schema.columnMetadata[ colId ] ) ) {
-              err = new Error( "project: unknown column Id '" + colId + "'" );
-              cbfn( err, null );
-              return;
-            }
-          }
-          var ns = Object.create( schema );
-          ns.columns = projectCols;
 
-          cbfn( error, ns );
+      // Singleton promise to calculate permutation and schema
+      var psp = null;
+
+      /* Use the inImpl schema and projectCols to calculate the permutation to
+       * apply to each input row to produce the result of the project.
+       */
+      function calcState( inSchema ) {
+        console.log( "calcState" );
+
+        var perm = [];
+        // ensure all columns in projectCols in schema:
+        for ( var i = 0 ; i < projectCols.length; i++ ) {
+          var colId = projectCols[ i ];
+          if( !( inSchema.columnMetadata[ colId ] ) ) {
+            err = new Error( "project: unknown column Id '" + colId + "'" );
+            throw err;
+          }
+          perm.push( inSchema.columnIndex( colId ) );
+        }
+        var ns = Object.create( inSchema );
+        ns.columns = projectCols;
+
+        return { "schema": ns, "permutation": perm };
+      }
+
+      function getPsp() {
+        if ( !psp ) {
+          psp = inImpl.getSchema().then( calcState );
+        }
+        return psp;
+      }
+
+      function getSchema() {
+        return getPsp().then( function( so ) {
+          return so.schema;
+        } );
+      };
+
+      function evalQuery() {        
+
+        function onProjectState( ps ) {
+
+          function permuteRowData( rowData ) {
+            function permuteOneRow( row ) {
+              return d3.permute( row, ps.permutation);
+            }
+            return rowData.map( permuteOneRow );
+          }
+
+          return inImpl.evalQuery().then( permuteRowData );
         }
 
-        inImpl.getSchema( onGetSchema );      
-      } 
-
-      function evalQuery( cbfn ) {
-        throw new Error( "not implemented yet" );
+        return getPsp().then( onProjectState );
       }
 
       return {
@@ -417,10 +456,10 @@
       return impl.getSchema();
     }
 
-    function evalQuery(queryExp,cbfn) {
+    function evalQuery(queryExp ) {
       var impl = getImpl( queryExp );
 
-      impl.evalQuery( cbfn );
+      return impl.evalQuery();
     }
 
     return {

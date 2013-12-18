@@ -12,18 +12,28 @@ asyncTest( "asyncTest: fetchURL tests", 1, function() {
       console.log( "promise failed.  Error: ", error );
       start();
     } );
-/*
+} );
+
+asyncTest( "asyncTest: fetchURL with bad URL", function() {
   var badUrl = "bad.json";
+
+  // See http://stackoverflow.com/questions/17544965/unhandled-rejection-reasons-should-be-empty
+  Q.stopUnhandledRejectionTracking();  // Q does something very odd that requires this..
+
+
+  console.log( "about to call fetchURL" );
   var promise2 = RelTab.fetchURL( badUrl );
+  console.log( "fetchURL called, about to call promise.then..." );
 
   promise2.then( function( resp ) {
     console.log( "FAIL: unexpected success fetching bad URL" );
     start();
-  }, function( error ) {
+  }, function( reason ) {
+    console.log( "badURL: promise failed, reason: ", reason );
     ok( true, "promise failed as expected for bad URL");
     start();
   } );
-*/
+  console.log( "promise.then call complete, returning control");
 });
 
 test( "hello test", function() {
@@ -48,7 +58,7 @@ test("basic reltab functionality", function() {
   // Create a promise error handler that will call start() to fail an asyncTest
   function mkAsyncErrHandler( msg ) {
     function handler( err ) {
-      console.log( msg, ": unexpected promise failure.  Error: ", err );
+      console.log( msg + ": unexpected promise failure.  Error: %O ", err );
       start();
     }
     return handler;
@@ -71,7 +81,7 @@ test("basic reltab functionality", function() {
     for ( var i = 0; i < columns.length; i++ ) {
       var colId = columns[ i ];
       var ct = schema.getColumnType( colId );
-      console.log( "column '" + colId + "': type: " + ct );
+      // console.log( "column '" + colId + "': type: " + ct );
       columnTypes.push( ct );
     }
     console.log( "columnTypes: ", columnTypes );
@@ -101,9 +111,8 @@ test("basic reltab functionality", function() {
 
   // TODO: Maybe query result should be some kind of generator or stream instead
   // of [[]]
-/*
-  function onQueryResult( error, res ) {
-    console.log( "onQueryResult: ", error, res );
+  function onQueryResult( res ) {
+    console.log( "onQueryResult: ", res );
     console.log( "result length: ", res.length );
     equal( res.length, 2873, "q1 results length");
 
@@ -118,13 +127,16 @@ test("basic reltab functionality", function() {
   }
 
   asyncTest( "asyncTest: evalQuery q1", 2, function() {
-    rt.evalQuery( q1, onQueryResult );
+    var p = rt.evalQuery( q1, onQueryResult );
+
+    p.then( onQueryResult, mkAsyncErrHandler( "evalQuery q1" ) );
   });
+
 
   var q2 = q1.project( [ "Name", "Title", "TCOE", "Job" ] );
 
-  function onQ2Result( error, res ) {
-    console.log( "onQ2Result: ", error, res );
+  function onQ2Result( res ) {
+    console.log( "onQ2Result: ", res );
     console.log( "result length: ", res.length );
     equal( res.length, 2873, "q2 results length");
 
@@ -136,12 +148,13 @@ test("basic reltab functionality", function() {
 
     start();
   }
-*/
-/*
+
   asyncTest( "asyncTest: evalQuery q2", 2, function() {
-    rt.evalQuery( q2, onQ2Result );
+    var p = rt.evalQuery( q2 );
+
+    p.then( onQ2Result );
   });
-*/
+
 /*
   var q2 = q1.select( rf.And().gt("TCOE",200000).eq("Job Family","Transportation Operations") )
              .project( [ "Name", "Title", "TCOE", "Job Family" ] );
