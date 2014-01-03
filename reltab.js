@@ -413,18 +413,9 @@
       }
     };
 
-    function groupByImpl( inImpl, cols, aggs ) {
-      var sp = null;  // state promise
-
-      console.log( "groupByImpl: cols: ", cols, ", aggs: ", aggs );
-
-      function getSP() {
-        if( !sp ) {
-          sp = inImpl.evalQuery().then( calcState );
-        }
-
-        return sp;
-      }
+    // A simple op is a function from a full evaluated query result { schema, rowData } -> { schema, rowData }
+    // This can easily be wrapped to make it async / promise-based / caching
+    function groupByImpl( cols, aggs ) {
 
       function calcSchema( inSchema ) {
         var gbs = Object.create( inSchema );
@@ -433,29 +424,113 @@
         return gbs;
       }
 
+      function fillArray(value, len) {
+        var arr = [];
+        for (var i = 0; i < len; i++) {
+          arr.push(value);
+        };
+        return arr;
+      }
+
+      function gb( tableData ) {
+
+        console.log( "gb: enter ");
+
+        var inSchema = tableData.schema;
+        var outSchema = calcSchema( inSchema );
+
+        var aggCols = aggs; // TODO: deal with explicitly specified (non-default) aggregations!
+
+        var groupMap = {};
+        var keyPerm = calcProjectionPermutation( inSchema, cols );
+        var aggColsPerm = calcProjectionPermutation( inSchema, aggCols );
+
+        // TODO: deal with non-sum aggs:
+        var aggZeros = fillArray( 0, aggs.length );
+        var aggFuncs = fillArray( function (x, y) { return x+y; }, aggs.length );
+
+        for ( var i = 0; i < tableData.rowData.length; i++ ) {
+          var inRow = tableData.rowData[ i ];
+
+          var keyData = d3.permute( inRow, keyPerm );
+          var aggInData = d3.permute( inRow, aggColsPerm );
+          var keyStr = JSON.stringify( keyData );
+
+          var groupRow = groupMap[ keyStr ];
+          var aggOutData = undefined;
+          if ( !groupRow ) {
+            aggOutData = aggZeros.slice();
+          } else {
+            aggOutData = groupRow.slice( keyData.length, keyData.length + aggs.length );
+          }
+          for ( var j = 0; j < aggOutData.length; j++ ) {
+            var af = aggFuncs[ j ];
+            aggOutData[ j ] = af( aggOutData[ j ], aggInData[ j ] );
+          }
+          // and put it back in our map:
+          var outRow = keyData.concat( aggOutData );
+          groupMap[ keyStr ] = outRow;
+        }  
+        rowData = [];
+        for ( keyStr in groupMap ) {
+          if ( groupMap.hasOwnProperty( keyStr ) ) {
+            outRow = groupMap[ keyStr ];
+            rowData.push( outRow );
+          }
+        }
+
+        console.log( "gb: exit" );
+        return { schema: outSchema, rowData: rowData };
+      }
+
+      return gb;
+    }
+
+    // Given a standard TableData -> TableData operator, wrap it in a Promise:
+    function promiseWrap( inImpl, opfn ) {
+      var sp = null;
+
+      var outData = null;
+
+      function getSP() {
+        if( !sp ) {
+          var schemaP = inImpl.getSchema();
+          var dataP = inImpl.evalQuery();
+          sp = Q.all( [ schemaP, dataP ] ).spread( function( schema, rowData ) {
+            console.log( "spread fn: ", schema, rowData );
+            return opfn( { schema: schema, rowData: rowData } );
+          } );
+        }
+
+        return sp;
+      }
+
       function getSchema() {
-        return inImpl.getSchema().then( calcSchema );
-      } 
+        return getSP().then( function( tableData ) { return tableData.schema; } );
+      }
 
       function evalQuery() {
-        // TODO
+        return getSP().then( function( tableData ) { return tableData.rowData; } );
       }
 
       return {
         "args": arguments,
         "getSchema": getSchema,
         "evalQuery": evalQuery
-      }
-    };
+      };
+    }
 
-
+    function groupByWrap( inImpl, cols, aggs ) {
+      var opfn = groupByImpl( cols, aggs );
+      return promiseWrap( inImpl, opfn );
+    }
 
     // map from operator names to implementation factories
     var opImplMap = {
       "table": tableRefImpl,
       "filter": filterImpl,
       "project": projectImpl,
-      "groupBy": groupByImpl,
+      "groupBy": groupByWrap
     };
 
     function getOpImpl( inOpImpl, exp ) {

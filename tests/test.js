@@ -172,7 +172,7 @@ test("basic reltab functionality", function() {
 
     p.then( onQ3GetSchema );
   } );
-/*
+
   function onQ3Result( res ) {
     console.log( "onQ3result:", res );
 
@@ -186,7 +186,6 @@ test("basic reltab functionality", function() {
 
     p.then( onQ3Result );
   } );
-*/
 
 });
 
