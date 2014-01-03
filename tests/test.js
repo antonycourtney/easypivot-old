@@ -155,11 +155,39 @@ test("basic reltab functionality", function() {
     p.then( onQ2Result );
   });
 
+
+  var q3 = q1.groupBy( [ "Job", "Title" ], [ "TCOE" ] );  // note: [ "TCOE" ] equivalent to [ [ "sum", "TCOE" ] ]
+
+  function onQ3GetSchema( rs ) {
+    console.log( "onQ3getSchema", rs );
+
+    var expCols = [ "Job", "Title", "TCOE" ];
+    deepEqual( rs.columns, expCols, "q3 GetSchema" );
+
+    start();
+  }
+
+  asyncTest( "asyncTest: getSchema q3", 1, function() {
+    var p = rt.getSchema( q3 );
+
+    p.then( onQ3GetSchema );
+  } );
 /*
-  var q2 = q1.select( rf.And().gt("TCOE",200000).eq("Job Family","Transportation Operations") )
-             .project( [ "Name", "Title", "TCOE", "Job Family" ] );
-  console.log( q2.toString() );
+  function onQ3Result( res ) {
+    console.log( "onQ3result:", res );
+
+    ok( true, "onQ3result called" );
+
+    start();
+  }
+
+  asyncTest( "asyncTest: evalQuery q3", 1, function() {
+    var p = rt.evalQuery( q3 );
+
+    p.then( onQ3Result );
+  } );
 */
+
 });
 
 test( "next test", function() {

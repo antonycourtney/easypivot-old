@@ -163,8 +163,11 @@
       return rs;
     }
 
-    function mkOperator(opName,args)
+    // variadic function to make an operator applied to args node in AST
+    function mkOperator(opName)
     {
+      var args = Array.prototype.slice.call(arguments);
+      args.shift();
       var opRep = { operator:opName, args:args, toString: opExpToString };
       var e = new RelTabQueryExp( _expChain, opRep );
       return e;
@@ -180,6 +183,10 @@
 
     function mkProjectExp( cols ) {
       return mkOperator( "project", cols );
+    }
+
+    function mkGroupBy( cols, aggs ) {
+      return mkOperator( "groupBy", cols, aggs );
     }
 
     function toString() {
@@ -200,13 +207,13 @@
       "select": mkSelectExp,
       "project": mkProjectExp,
       "toString": toString,
-      "_getRep": getRep,
+      "groupBy": mkGroupBy,
       // "rowCount"
-      // "groupBy": mkGroupBy
-      // TODO: join
+      // "join"
       // "sort"
-      // TODO: "extend": mkExtendExp,
+      // "extend": mkExtendExp,
       // "crossTab"
+      "_getRep": getRep,
     };
   }
 
@@ -267,7 +274,7 @@
       if( !tcp ) {
         var url = "../json/" + tableName + ".json";        
 
-        console.log( "ensureLoaded: table '", tableName, "': not in caching, loading URL." );
+        console.log( "ensureLoaded: table '", tableName, "' not in cache, loading URL." );
 
         // We'll use .then to construct a Promise that gives us a TableRep (not just the raw JSON) and store this
         // in the tableCache:
@@ -286,7 +293,7 @@
       return tcp;
     }
 
-    function TableRefImpl( inImpl, tableName ) {
+    function tableRefImpl( inImpl, tableName ) {
 
       function getSchema() {
 
@@ -315,14 +322,24 @@
       };
     }
 
-    /*
-     * TODO: We need to rethink this a bit.
-     * Issues:
-     *   - We should try to do some lazy eval so we can re-use results.
-     *   - Probably have some amount of validating processing (like checking of columns for validity)
-     *     that should happen whether operation is getSchema or evalQuery.
-     */
-    function ProjectImpl( inImpl, projectCols ) {
+
+    // Given an input Schema and an array of columns to project, calculate permutation
+    // to apply to each row to obtain the projection
+    function calcProjectionPermutation( inSchema, projectCols ) {
+      var perm = [];
+      // ensure all columns in projectCols in schema:
+      for ( var i = 0 ; i < projectCols.length; i++ ) {
+        var colId = projectCols[ i ];
+        if( !( inSchema.columnMetadata[ colId ] ) ) {
+          err = new Error( "project: unknown column Id '" + colId + "'" );
+          throw err;
+        }
+        perm.push( inSchema.columnIndex( colId ) );
+      }
+      return perm;
+    }
+
+    function projectImpl( inImpl, projectCols ) {
 
       // Singleton promise to calculate permutation and schema
       var psp = null;
@@ -333,16 +350,7 @@
       function calcState( inSchema ) {
         console.log( "calcState" );
 
-        var perm = [];
-        // ensure all columns in projectCols in schema:
-        for ( var i = 0 ; i < projectCols.length; i++ ) {
-          var colId = projectCols[ i ];
-          if( !( inSchema.columnMetadata[ colId ] ) ) {
-            err = new Error( "project: unknown column Id '" + colId + "'" );
-            throw err;
-          }
-          perm.push( inSchema.columnIndex( colId ) );
-        }
+        var perm = calcProjectionPermutation( inSchema, projectCols );
         var ns = Object.create( inSchema );
         ns.columns = projectCols;
 
@@ -387,13 +395,49 @@
     };
 
 
-    function SelectImpl( inImpl, fexp ) {
-      function getSchema( cbfn ) {
-        // select doesn't modify schema; just pass through:
-        inImpl.getSchema( cbfn );      
+    function filterImpl( inImpl, fexp ) {
+      function getSchema() {
+        // filter doesn't modify schema; just pass through:
+        return inImpl.getSchema();      
       } 
 
-      function evalQuery( cbfn ) {
+      function evalQuery() {
+        // TODO
+        throw new Error("not implemented");
+      }
+
+      return {
+        "args": arguments,
+        "getSchema": getSchema,
+        "evalQuery": evalQuery
+      }
+    };
+
+    function groupByImpl( inImpl, cols, aggs ) {
+      var sp = null;  // state promise
+
+      console.log( "groupByImpl: cols: ", cols, ", aggs: ", aggs );
+
+      function getSP() {
+        if( !sp ) {
+          sp = inImpl.evalQuery().then( calcState );
+        }
+
+        return sp;
+      }
+
+      function calcSchema( inSchema ) {
+        var gbs = Object.create( inSchema );
+        gbs.columns = cols.concat( aggs ); // TODO: deal with explicitly specified (non-default) aggregations!
+
+        return gbs;
+      }
+
+      function getSchema() {
+        return inImpl.getSchema().then( calcSchema );
+      } 
+
+      function evalQuery() {
         // TODO
       }
 
@@ -406,31 +450,24 @@
 
 
 
-    function loadTable(tableName,cbfn) {
-      var url = "json/" + tableName + ".json";
-
-      function onGet(error, urlData) {
-        // TODO: error handling!
-        console.log( urlData );
-        data = urlData;
-        dataLoaded = true;
-
-        cbfn( this );
-      }
-
-      d3.json(url, onGet);  // TODO / FIXME: Perhaps drop d3 dependency
-    };
-
-    // map from operator names to implementation constructors
+    // map from operator names to implementation factories
     var opImplMap = {
-      "table": TableRefImpl,
-      "select": SelectImpl,
-      "project": ProjectImpl
+      "table": tableRefImpl,
+      "filter": filterImpl,
+      "project": projectImpl,
+      "groupBy": groupByImpl,
     };
 
     function getOpImpl( inOpImpl, exp ) {
-      var opCtor = opImplMap[ exp.operator ];
-      var opImpl = new opCtor( inOpImpl, exp.args );
+      var opFactory = opImplMap[ exp.operator ];
+
+      var args = exp.args.slice();
+      args.unshift( inOpImpl );
+
+      var opImpl = opFactory.apply( null, args );
+      /* var opImpl = Object.create( opCtor.prototype );
+       opCtor.apply( opImpl, inOpImpl, exp.args );
+      */
       return opImpl;
     }
 
