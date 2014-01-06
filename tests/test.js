@@ -2,7 +2,7 @@
 asyncTest( "asyncTest: fetchURL tests", 1, function() {
   var goodUrl = "../json/bart-comp-all.json";
 
-  var promise = RelTab.fetchURL( goodUrl );
+  var promise = relTab.fetchURL( goodUrl );
 
   promise.then( function( resp ) {
       console.log( "promise success! Response: ", resp );
@@ -22,7 +22,7 @@ asyncTest( "asyncTest: fetchURL with bad URL", function() {
 
 
   console.log( "about to call fetchURL" );
-  var promise2 = RelTab.fetchURL( badUrl );
+  var promise2 = relTab.fetchURL( badUrl );
   console.log( "fetchURL called, about to call promise.then..." );
 
   promise2.then( function( resp ) {
@@ -36,21 +36,17 @@ asyncTest( "asyncTest: fetchURL with bad URL", function() {
   console.log( "promise.then call complete, returning control");
 });
 
-test( "hello test", function() {
-  ok( 1 == "1", "Passed!" );
-  ok( true, "Second subtest");
-});
 test("basic reltab functionality", function() {
-  var rf = RelTab.Filter;
-  var e1 = rf.And().eq("x",25).eq("y","hello");
+  var rf = relTab.filter;
+  var e1 = rf.and().eq("x",25).eq("y","hello");
   var s1 = e1.toSqlWhere();
   console.log( s1 );
   ok( s1 == "x=25 and y='hello'", "basic filter expression: " + s1 );
 
 
-  var e2 = rf.And()
+  var e2 = rf.and()
             .eq("x",30).eq("y","goodbye")
-            .subExp( rf.Or().gt("z",50).gt("a","b") );
+            .subExp( rf.or().gt("z",50).gt("a","b") );
   var s2 = e2.toSqlWhere();
   console.log( s2 );  
   ok( s2 == "x=30 and y='goodbye' and ( z>50 or a>'b' )", "filter with subexp and or: " + s2 );
@@ -94,13 +90,13 @@ test("basic reltab functionality", function() {
     start();
   }
 
-  var q1 = RelTab.Query()
+  var q1 = relTab.query()
             .table( "bart-comp-all" );
 
   console.log( q1.toString() );
   ok( true, "basic query expression construction" );
 
-  var rt = RelTab.Local();
+  var rt = relTab.local();
 
   asyncTest( "async test: getSchema", 2, function() {
 
@@ -167,8 +163,10 @@ test("basic reltab functionality", function() {
     start();
   }
 
+  var q3i = rt.getImpl( q3 );
+
   asyncTest( "asyncTest: getSchema q3", 1, function() {
-    var p = rt.getSchema( q3 );
+    var p = q3i.getSchema( q3 );
 
     p.then( onQ3GetSchema );
   } );
@@ -182,7 +180,7 @@ test("basic reltab functionality", function() {
   }
 
   asyncTest( "asyncTest: evalQuery q3", 1, function() {
-    var p = rt.evalQuery( q3 );
+    var p = q3i.evalQuery( q3 );
 
     p.then( onQ3Result );
   } );

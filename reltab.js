@@ -1,12 +1,12 @@
 (function ($) {
   $.extend(true,window, {
-    RelTab: {
-      Local: LocalRelTab,
-      Remote: RelTabClient,
-      Query: createQueryExp,
-      Filter: {
-        And: createFilterAndExp,
-        Or: createFilterOrExp
+    relTab: {
+      local: localRelTab,
+      remote: relTabClient,
+      query: createQueryExp,
+      filter: {
+        and: createFilterAndExp,
+        or: createFilterOrExp
       },
       fetchURL: fetchURL
     } 
@@ -225,7 +225,7 @@
   /*
    * Pure client-side implementation of RelTab engine on RelTab JSON data files
    */
-  function LocalRelTab() {
+  function localRelTab() {
     var tableCache = {};
 
     function Schema( schemaData ) {
@@ -576,11 +576,12 @@
 
     return {
       "getSchema": getSchema,
-      "evalQuery": evalQuery, 
+      "evalQuery": evalQuery,
+      "getImpl": getImpl, 
     };
   }
 
-  function RelTabClient( tableName ) {
+  function relTabClient( tableName ) {
     // TODO
     return {};
   }
