@@ -293,35 +293,9 @@
       return tcp;
     }
 
-    function tableRefImpl( inImpl, tableName ) {
-
-      function getSchema() {
-
-        function onLoad( trep ) {
-          return trep.schema;
-        }
-
-        var lp = ensureLoaded( tableName );
-        return lp.then( onLoad );
-      }
-
-      function evalQuery() {
-
-        function onLoad( trep ) {
-          return trep.rowData;
-        }
-
-        var lp = ensureLoaded( tableName, onLoad );
-
-        return lp.then( onLoad );
-      }
-
-      return {
-        "getSchema": getSchema,
-        "evalQuery": evalQuery
-      };
+    function tableRefImpl( tableName ) {
+      return ensureLoaded( tableName );
     }
-
 
     // Given an input Schema and an array of columns to project, calculate permutation
     // to apply to each row to obtain the projection
@@ -339,7 +313,7 @@
       return perm;
     }
 
-    function projectImpl( inImpl, projectCols ) {
+    function projectImpl( projectCols ) {
 
       // Singleton promise to calculate permutation and schema
       var psp = null;
@@ -357,59 +331,23 @@
         return { "schema": ns, "permutation": perm };
       }
 
-      function getPsp() {
-        if ( !psp ) {
-          psp = inImpl.getSchema().then( calcState );
+      function pf( tableData ) {
+        var ps = calcState( tableData.schema );
+        function permuteOneRow( row ) {
+          return d3.permute( row, ps.permutation);
         }
-        return psp;
+        var outRowData = tableData.rowData.map( permuteOneRow );
+
+        return { "schema": ps.schema, "rowData": outRowData };
       }
 
-      function getSchema() {
-        return getPsp().then( function( so ) {
-          return so.schema;
-        } );
-      };
-
-      function evalQuery() {        
-
-        function onProjectState( ps ) {
-
-          function permuteRowData( rowData ) {
-            function permuteOneRow( row ) {
-              return d3.permute( row, ps.permutation);
-            }
-            return rowData.map( permuteOneRow );
-          }
-
-          return inImpl.evalQuery().then( permuteRowData );
-        }
-
-        return getPsp().then( onProjectState );
-      }
-
-      return {
-        "args": arguments,
-        "getSchema": getSchema,
-        "evalQuery": evalQuery
-      }
+      return pf;
     };
 
 
-    function filterImpl( inImpl, fexp ) {
-      function getSchema() {
-        // filter doesn't modify schema; just pass through:
-        return inImpl.getSchema();      
-      } 
-
-      function evalQuery() {
-        // TODO
-        throw new Error("not implemented");
-      }
-
-      return {
-        "args": arguments,
-        "getSchema": getSchema,
-        "evalQuery": evalQuery
+    function filterImpl( fexp ) {
+      function ff( tableData ) {
+        return tableData; // TODO!
       }
     };
 
@@ -486,98 +424,68 @@
       return gb;
     }
 
-    // Given a standard TableData -> TableData operator, wrap it in a Promise:
-    function promiseWrap( inImpl, opfn ) {
-      var sp = null;
-
-      var outData = null;
-
-      function getSP() {
-        if( !sp ) {
-          var schemaP = inImpl.getSchema();
-          var dataP = inImpl.evalQuery();
-          sp = Q.all( [ schemaP, dataP ] ).spread( function( schema, rowData ) {
-            console.log( "spread fn: ", schema, rowData );
-            return opfn( { schema: schema, rowData: rowData } );
-          } );
-        }
-
-        return sp;
-      }
-
-      function getSchema() {
-        return getSP().then( function( tableData ) { return tableData.schema; } );
-      }
-
-      function evalQuery() {
-        return getSP().then( function( tableData ) { return tableData.rowData; } );
-      }
-
-      return {
-        "args": arguments,
-        "getSchema": getSchema,
-        "evalQuery": evalQuery
-      };
-    }
-
-    function groupByWrap( inImpl, cols, aggs ) {
-      var opfn = groupByImpl( cols, aggs );
-      return promiseWrap( inImpl, opfn );
-    }
-
-    // map from operator names to implementation factories
-    var opImplMap = {
-      "table": tableRefImpl,
+    var simpleOpImplMap = {
       "filter": filterImpl,
       "project": projectImpl,
-      "groupBy": groupByWrap
-    };
-
-    function getOpImpl( inOpImpl, exp ) {
-      var opFactory = opImplMap[ exp.operator ];
-
-      var args = exp.args.slice();
-      args.unshift( inOpImpl );
-
-      var opImpl = opFactory.apply( null, args );
-      /* var opImpl = Object.create( opCtor.prototype );
-       opCtor.apply( opImpl, inOpImpl, exp.args );
-      */
-      return opImpl;
+      "groupBy": groupByImpl
     }
 
-    function getImpl( queryExp ) {
+    // given a chain of simple operators (TableData -> TableData functions), compose them in to a
+    // TableData -> TableData function 
+    function evalSimpleExpChain( expChain ) {
+      // map chain of expression ASTs into TableData -> TableData closures
+      var impChain = [];
+      for ( var i = 0; i < expChain.length; i++ ) {
+        var exp = expChain[ i ];
+        var opImpl = simpleOpImplMap[ exp.operator ];
+        var args = exp.args.slice();
+        var impFn = opImpl.apply( null, args ); // apply args and get back a TableData -> TableData fn
+        impChain.push( impFn );
+      }
+
+      function af( tableData ) {
+        var ret = tableData;
+        for ( var i = 0; i < impChain.length; i++ ) {
+          var opf = impChain[ i ];
+          ret = opf( ret );
+        }
+        return ret;
+      }
+
+      return af;
+    }
+
+
+    // map from operator names to implementation factories
+    var baseOpImplMap = {
+      "table": tableRefImpl
+    };
+
+    function getBaseOpImpl( exp ) {
+      var opImpl = baseOpImplMap[ exp.operator ];
+
+      var args = exp.args.slice();
+      var opRes = opImpl.apply( null, args );
+      return opRes;
+    }
+
+    function evalQuery( queryExp ) {
       var expChain = queryExp._getRep();
       var opImpl = null;
 
-      /*
-       * Potential optimization:  Could build a smarter tree based on what operators we see in expression chain.
-       * Example:  we could eliminate dynamic indirections on getSchema() for operators that don't modify their input
-       * schema.
-       */
-      for ( i=0; i < expChain.length; i++ ) {
-        var e = expChain[i];
-        opImpl = getOpImpl( opImpl, e );
+      if ( expChain.length < 1 ) {
+        throw new Error( "evalQuery: empty query chain" );
       }
-      return opImpl;
-    }
 
-    function getSchema( queryExp ) {
-      var impl = getImpl( queryExp );
+      // TODO: Deal with join(), which will have more than one source table!
+      var baseExp = expChain.shift();
+      opImpl = getBaseOpImpl( baseExp );
 
-      return impl.getSchema();
-    }
-
-    function evalQuery(queryExp ) {
-      var impl = getImpl( queryExp );
-
-      return impl.evalQuery();
+      return opImpl.then( evalSimpleExpChain( expChain ) )
     }
 
     return {
-      "getSchema": getSchema,
-      "evalQuery": evalQuery,
-      "getImpl": getImpl, 
+      "evalQuery": evalQuery, 
     };
   }
 
