@@ -1,7 +1,7 @@
 Design and Impl Notes for EasyPivot
 
 A RelTab engine is:
-   evalQuery : Query -> Promise<TableDataSource>
+   evalQuery :: Query -> Promise<TableDataSource>
 
 where TableData is an object providing a Schema and RowData.
 
@@ -13,49 +13,29 @@ Maybe TableDataSource is:
     getRowData :: Int, Int -> Promise<[[Any]]>  
 }
 
+AggTree gives us:
 
-OK, so if we pop up to AggTree what will we have:
+    vpivot :: function( rt : RelTab, baseQuery : Query, pivotColumns : [String] ): Promise<TreeDataSource>
 
-A TreeDataSource is:
+
+Where TreeDataSource is:
 {
     schema :: Schema
     queryForPath :: Path -> Query
 }
 where Path = [Any]
 
-Note the use of Query on rhs here instead of Promise<TableDataSource>.  
-That should ensure that we can always apply additional operators to the original query to add (for example) another level of pivots.
+Note the use of Query on rhs here instead of Promise<TableDataSource>.  That should enable us to do things like walk down to a particular level of the pivot tree and then open the query determined by that level as a new window.  
+
 
 Could, of course, be even lazier about this and also include a Column Range instead of just a Row range in the
 argument to getRowData...
 
 Presumably childrenForPath is equal to projection on first column of resulting table ( Actually we can probably leave this out entirely... )
 
-----
-How Will vpivot operator work?
-
-Let's assume:
-   - We have a TreeDataSource as input.
-   - The schema has already had pivot column pre-pended
-
-So let's consider the case where we pivot by [ "JobFamily", "Title" ]
-
-to add one level of pivot:
-   _inTree :: TreeDataSource
-   pivotColumn = "Title"
-
-t0.pivot("JobFamily").pivot("Title")
-
-or
-
-t0.pivot("Title").pivot("JobFamily")
-
-probably the latter?
-
-Or do they have anything to do with each other whatsoever?
-
-Maybe this is just silly and we should just focus on 
-
+We had previously considered trying to make vpivot operator take a single column identifier and map a TreeDataSource to a
+TreeDataSource but it just seemed more complicated and not particularly useful so I've reverted back to having a one-shot
+operator that takes an array of columns and offers a path -> table function in one shot.
 
 ==================
 TODO:
@@ -67,3 +47,16 @@ TODO:
 
 What's the right model for dealing with ticking tables??
 What's the connection between Signals / Streams and Promises ??
+   We would invert our structure and think about what our pivot table will depend on in terms of data sources...
+   On the source side I can envision an operator whose signature would be:
+       baseTable :: String -> SF () TableData
+   where argument is a (static) URL and TableData is roughly akin to a TableDataSource.
+   But of course we need to address the nesting of Promises in original signature somehow...
+   That means doing something like one of:
+     - depending on host language laziness and return a getRowData function
+     - returning a (Schema, SF () [[Any]] ) to be switched in to
+     - just doing ( Schema, [[Any]] ) and living with it
+   Each of these answers suck.  There must be a better way.  The challenge here is that, on the one hand, we want to be able to see asychrony and have laziness, but on the other hand we don't want too much "magic" that makes it difficult to reason
+   about what's happening.
+
+

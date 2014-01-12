@@ -159,7 +159,7 @@
       _expChain.push( opRep );
 
     function opExpToString() {
-      var rs = this.operator + " ( " + this.args.toString() + " )";
+      var rs = this.operator + " ( " + JSON.stringify( this.args ) + " )";
       return rs;
     }
 
@@ -462,14 +462,16 @@
 
     function getBaseOpImpl( exp ) {
       var opImpl = baseOpImplMap[ exp.operator ];
-
+      if ( !opImpl ) {
+        throw new Error( "getBaseOpImpl: unknown operator '" + exp.operator + "'" );
+      }
       var args = exp.args.slice();
       var opRes = opImpl.apply( null, args );
       return opRes;
     }
 
     function evalQuery( queryExp ) {
-      var expChain = queryExp._getRep();
+      var expChain = queryExp._getRep().slice();
       var opImpl = null;
 
       if ( expChain.length < 1 ) {
