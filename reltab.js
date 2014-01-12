@@ -146,12 +146,12 @@
     return new RelTabFilterExp("or");
   }
 
-  /*
-   * Returns an (initially empty) RelTab Query Spec that
-   * allows a query specification to be constructed using
-   * operator chaining.
+  /* AST rep for query expressions.
+   * Expressions formed by chaining method calls on an initially
+   * empty query.
+   * Each call to ctor appends opRep to _expChain.
+   * Constructor not exposed in user API
    */
-
   // constructor
   function RelTabQueryExp(inChain, opRep) {
     var _expChain = inChain.slice(); // shallow copy inChain
@@ -354,7 +354,6 @@
     // A simple op is a function from a full evaluated query result { schema, rowData } -> { schema, rowData }
     // This can easily be wrapped to make it async / promise-based / caching
     function groupByImpl( cols, aggs ) {
-
       function calcSchema( inSchema ) {
         var gbs = Object.create( inSchema );
         gbs.columns = cols.concat( aggs ); // TODO: deal with explicitly specified (non-default) aggregations!
@@ -372,7 +371,7 @@
 
       function gb( tableData ) {
 
-        console.log( "gb: enter ");
+        console.log( "gb: enter: cols.length ", cols.length );
 
         var inSchema = tableData.schema;
         var outSchema = calcSchema( inSchema );
@@ -485,6 +484,7 @@
     }
 
     return {
+      "Schema": Schema,
       "evalQuery": evalQuery, 
     };
   }
