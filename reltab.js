@@ -325,8 +325,7 @@
         console.log( "calcState" );
 
         var perm = calcProjectionPermutation( inSchema, projectCols );
-        var ns = Object.create( inSchema );
-        ns.columns = projectCols;
+        var ns = new Schema( { columns: projectCols, columnMetadata: inSchema.columnMetadata } );
 
         return { "schema": ns, "permutation": perm };
       }
@@ -354,9 +353,11 @@
     // A simple op is a function from a full evaluated query result { schema, rowData } -> { schema, rowData }
     // This can easily be wrapped to make it async / promise-based / caching
     function groupByImpl( cols, aggs ) {
+      var aggCols = aggs;  // TODO: deal with explicitly specified (non-default) aggregations!
+
       function calcSchema( inSchema ) {
-        var gbs = Object.create( inSchema );
-        gbs.columns = cols.concat( aggs ); // TODO: deal with explicitly specified (non-default) aggregations!
+        var gbCols = cols.concat( aggCols );
+        var gbs = new Schema( { columns: gbCols, columnMetadata: inSchema.columnMetadata } );
 
         return gbs;
       }
@@ -367,6 +368,72 @@
           arr.push(value);
         };
         return arr;
+      }
+
+      function SumAgg() {
+        this.sum = 0;
+      }
+
+      SumAgg.prototype.mplus = function( val ) {
+        if ( typeof val !== "undefined" )
+          this.sum += val;
+
+        return this;
+      }
+
+      SumAgg.prototype.finalize = function() {
+        return this.sum;
+      }
+
+      function UniqAgg() {
+        this.initial = true;        
+        this.str = undefined;
+      }
+
+      UniqAgg.prototype.mplus = function( val ) {
+        if ( typeof val !== "undefined" ) {
+          if ( this.initial ) {
+            this.str = val;
+            this.initial = false; // our first defined val
+          } else {
+            if( this.str != val )
+              this.str = undefined; 
+          }
+        }
+      }
+      UniqAgg.prototype.finalize = function() {
+        return this.str;
+      }
+
+      function AvgAgg() {
+        this.count = 0;
+        this.sum = 0;
+      }
+
+      AvgAgg.prototype.mplus = function( val ) {
+        if ( typeof val !== "undefined" ) {
+          this.count++;
+          this.sum += val;
+        }
+        return this;
+      }
+      AvgAgg.prototype.finalize = function() {
+        if ( this.count == 0 )
+          return NaN;
+        return this.sum / this.count;
+      }
+
+      // map of constructors for agg operators:
+      var aggMap = {
+        "uniq": UniqAgg,
+        "sum": SumAgg,
+        "avg": AvgAgg, 
+      }
+
+      // map from column type to default agg functions:
+      var defaultAggs = {
+        "integer": SumAgg,
+        "text": UniqAgg
       }
 
       function gb( tableData ) {
@@ -382,9 +449,21 @@
         var keyPerm = calcProjectionPermutation( inSchema, cols );
         var aggColsPerm = calcProjectionPermutation( inSchema, aggCols );
 
-        // TODO: deal with non-sum aggs:
-        var aggZeros = fillArray( 0, aggs.length );
-        var aggFuncs = fillArray( function (x, y) { return x+y; }, aggs.length );
+        // construct and return an an array of aggregation objects appropriate
+        // to each agg fn and agg column passed to groupBy
+
+        function mkAggAccs() {
+          var aggAccs = [];
+          for ( var i = 0; i < aggCols.length; i++ ) {
+            // TODO: check for typeof aggs[i] == array and use specified agg
+            var aggColType = inSchema.columnMetadata[ aggCols[ i ] ].type;
+            var aggCtor = defaultAggs[ aggColType ];
+            var accObj = new aggCtor();
+            aggAccs.push( accObj );
+          }
+          return aggAccs;
+        }
+
 
         for ( var i = 0; i < tableData.rowData.length; i++ ) {
           var inRow = tableData.rowData[ i ];
@@ -394,25 +473,30 @@
           var keyStr = JSON.stringify( keyData );
 
           var groupRow = groupMap[ keyStr ];
-          var aggOutData = undefined;
+          var aggAccs = undefined;
           if ( !groupRow ) {
-            aggOutData = aggZeros.slice();
-          } else {
-            aggOutData = groupRow.slice( keyData.length, keyData.length + aggs.length );
+            // console.log( "Adding new group for key '" + keyStr + "'");
+            aggAccs = mkAggAccs();
+            // make an entry in our map:
+            groupRow = keyData.concat( aggAccs );
+            groupMap[ keyStr ] = groupRow;            
           }
-          for ( var j = 0; j < aggOutData.length; j++ ) {
-            var af = aggFuncs[ j ];
-            aggOutData[ j ] = af( aggOutData[ j ], aggInData[ j ] );
+          for ( var j = keyData.length; j < groupRow.length; j++ ) {
+            var acc = groupRow[ j ];
+            acc.mplus( aggInData[ j - keyData.length ] );
           }
-          // and put it back in our map:
-          var outRow = keyData.concat( aggOutData );
-          groupMap[ keyStr ] = outRow;
         }  
+
+        // finalize!
         rowData = [];
         for ( keyStr in groupMap ) {
           if ( groupMap.hasOwnProperty( keyStr ) ) {
-            outRow = groupMap[ keyStr ];
-            rowData.push( outRow );
+            groupRow = groupMap[ keyStr ];
+            keyData = groupRow.slice( 0, cols.length );
+            for ( var j = keyData.length; j < groupRow.length; j++ ) {
+              groupRow[ j ] = groupRow[ j ].finalize();                
+            }
+            rowData.push( groupRow );
           }
         }
 

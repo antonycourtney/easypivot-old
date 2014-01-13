@@ -18,7 +18,7 @@ asyncTest( "asyncTest: fetchURL with bad URL", function() {
   var badUrl = "bad.json";
 
   // See http://stackoverflow.com/questions/17544965/unhandled-rejection-reasons-should-be-empty
-  Q.stopUnhandledRejectionTracking();  // Q does something very odd that requires this..
+  // Q.stopUnhandledRejectionTracking();  // Q does something very odd that requires this..
 
 
   console.log( "about to call fetchURL" );
@@ -55,11 +55,24 @@ test("basic reltab functionality", function() {
 // Create a promise error handler that will call start() to fail an asyncTest
 function mkAsyncErrHandler( msg ) {
   function handler( err ) {
-    console.log( msg + ": unexpected promise failure.  Error: %O ", err );
+    console.error( msg + ": unexpected promise failure.  Error: %O ", err );
     start();
   }
   return handler;
 }
+
+function columnSum( tableData, columnId ) {
+  var sum = 0;
+
+  var colIndex = tableData.schema.columnIndex( columnId );
+  for ( var i=0; i < tableData.rowData.length; i++ ) {
+    sum += tableData.rowData[i][colIndex];
+  };
+  return sum;
+}
+
+var tcoeSum = 0;
+
 
 function onQ1Result( res ) {
   console.log( "onQ1Result: ", res );
@@ -102,6 +115,9 @@ function onQ1Result( res ) {
 
   deepEqual( rowData[0], expRow0, "q1 row 0 " );
 
+  tcoeSum = columnSum( res, "TCOE" );
+  console.log( "tcoeSum: ", tcoeSum );
+
   start();
 }
 
@@ -114,10 +130,10 @@ asyncTest( "async test: simple table query", 5, function() {
   console.log( q1.toString() );
   ok( true, "basic query expression construction" );
   var p1 = rt.evalQuery( q1 );
-  p1.then( onQ1Result, mkAsyncErrHandler( "simple table query" ) );
+  p1.then( onQ1Result ).fail( mkAsyncErrHandler( "simple table query" ) );
 });
 
-var q2 = q1.project( [ "Name", "Title", "TCOE", "Job" ] );
+var q2 = q1.project( [ "Job", "Title", "Union", "Name", "Base", "TCOE" ] );
 
 function onQ2Result( res ) {
   console.log( "onQ2Result: ", res );
@@ -127,7 +143,7 @@ function onQ2Result( res ) {
 
   console.log( res.rowData[0]);
 
-  var expRow0 = ["Crunican, Grace", "General Manager", 399921,  "Executive Management" ];
+  var expRow0 = ["Executive Management", "General Manager", "Non-Represented", "Crunican, Grace", 312461, 399921];
 
   deepEqual( res.rowData[0], expRow0, "q2 row 0 " );
 
@@ -137,7 +153,7 @@ function onQ2Result( res ) {
 asyncTest( "asyncTest: evalQuery q2", 2, function() {
   var p = rt.evalQuery( q2 );
 
-  p.then( onQ2Result );
+  p.then( onQ2Result ).fail( mkAsyncErrHandler( "evalQuery q2" ) );
 });
 
 var q3 = q1.groupBy( [ "Job", "Title" ], [ "TCOE" ] );  // note: [ "TCOE" ] equivalent to [ [ "sum", "TCOE" ] ]
@@ -149,14 +165,40 @@ function onQ3Result( res ) {
   var expCols = [ "Job", "Title", "TCOE" ];
   deepEqual( rs.columns, expCols, "q3 schema" );
 
-  // TODO: check res.rowData
-  ok( true, "onQ3result called" );
+  deepEqual( res.rowData.length, 380, "number of grouped rows in q3 result" );
+
+  var groupSum = columnSum( res, "TCOE" );
+
+  deepEqual( groupSum, tcoeSum, "tcoe sum after groupBy" );
 
   start();
 }
 
-asyncTest( "asyncTest: evalQuery q3", 2, function() {
+asyncTest( "asyncTest: evalQuery q3", 3, function() {
   var p = rt.evalQuery( q3 );
 
-  p.then( onQ3Result );
+  p.then( onQ3Result ).fail( mkAsyncErrHandler( "evalQuery q3" ) );
 } );
+
+var q4 = q2.groupBy( ["Job"], [ "Title", "Union", "Name", "Base", "TCOE" ] );
+
+asyncTest( "asyncTest: evalQuery q4", 3, function() {
+  var p = rt.evalQuery( q4 );
+  p.then( onQ4Result ).fail( mkAsyncErrHandler( "evalQuery q4" ) );
+})
+
+function onQ4Result( res ) {
+  console.log( "onQ4result", res );
+
+  var rs = res.schema;
+
+  var expCols = [ "Job", "Title", "Union", "Name", "Base", "TCOE" ];
+  deepEqual( rs.columns, expCols );
+
+  deepEqual( res.rowData.length, 19, "number of grouped rows in q4 result" );
+
+  var groupSum = columnSum( res, "TCOE" );
+  deepEqual( groupSum, tcoeSum, "tcoe sum after groupBy" );
+
+  start();
+}
