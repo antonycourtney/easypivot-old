@@ -337,7 +337,7 @@
       var TOK_INT = 2;
 
       var identRE = /[a-zA-Z][a-zA-Z0-9]*/;
-      var strRE = /'([^']*)'/;
+      var strRE = /'([^']*)'/;  // TODO: deal with escaped quotes
       var intRE = /[0-9]+/;
 
       function exactMatch( re, target ) {

@@ -41,11 +41,11 @@
         }
 
         if ( path.length > 0 ) {
-          var pred = relTab.filter.and();
+          var pred = relTab.and();
           for ( var i = 0; i < path.length; i++ ) {
-            pred = pred.eq( pivotColumns[i], path[i] );
+            pred = pred.eq( pivotColumns[i], "'" + path[i] + "'" );
           }
-          pathQuery = pathQuery.restrict( pred );
+          pathQuery = pathQuery.filter( pred );
         }
 
         if( path.length < pivotColumns.length ) {
