@@ -27,6 +27,15 @@ asyncTest("basic aggTree functionality", 3, function() {
     var p1 = rt.evalQuery( q1 );
     p1.then( onQ1Result );
 
+    var q2 = tree0.applyPath( [ "Executive Management" ] );
+    console.log( "query for path /Executive Management: ", q2.toString() );
+    console.log( q2 );
+
+    var p2 = rt.evalQuery( q2 );
+    p2.then( onQ2Result );
+
+    // TODO: call start after all promises fulfilled.
+
   } );
 
 
@@ -45,5 +54,10 @@ function onQ1Result( res ) {
   var actSum = columnSum( res, "TCOE" );
 
   deepEqual( actSum, 349816190, "Q1 rowData sum(TCOE)" );
-  start();
 };
+
+function onQ2Result( res ) {
+  console.log( "onQ2Result:", res );
+
+  start();
+}

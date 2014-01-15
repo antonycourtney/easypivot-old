@@ -4,10 +4,10 @@
       local: localRelTab,
       remote: relTabClient,
       query: createQueryExp,
-      filter: {
-        and: createFilterAndExp,
-        or: createFilterOrExp
-      },
+      // filter support:
+      and: createFilterAndExp,
+      or: createFilterOrExp,
+
       fetchURL: fetchURL
     } 
   });
@@ -33,13 +33,6 @@
 
   /**
    * Enable construction of a RelTab Filter expression by operator chaining.
-   * 
-   * Example:
-   * ```js
-   *   var fgen = EasyPivot.RelTab.FilterExp.And;
-   *
-   *   var exp0 = fgen().gt("TCOE",400000).eq("Job Family","Transportation Operations");
-   * ```
    */
 
    /* Constructor function */
@@ -49,26 +42,13 @@
       args: []  // array of conjunctions / disjuncts
     };
 
-    function mkColumnRelOp( relOp, colName, cmpVal ) {
+    function mkRelOp( relOp, lhs, rhs ) {
       return {
-        type: "columnRelOp",
+        type: "RelOp",
         relOp: relOp,
-        column: colName,
-        value: cmpVal
+        lhs: lhs,
+        rhs: rhs
       };
-    }
-
-    function ppVal(v) {
-      var isString = (typeof v == "string" );
-      var s = "";
-
-      if (isString) {
-        // FIXME / TODO: escape any quotes in string!
-        s = "'" + v  + "'";
-      } else {
-        s = v.toString();
-      }
-      return s;
     }
 
     var ppOpMap = {
@@ -79,8 +59,8 @@
       "le": "<="
     };
 
-    function ppColumnRelOp(exp) {
-      var s = exp.column + ppOpMap[exp.relOp] + ppVal( exp.value );
+    function ppRelOp(exp) {
+      var s = exp.lhs + ppOpMap[exp.relOp] + exp.rhs;
       return s;
     }
 
@@ -90,7 +70,7 @@
     }
 
     var ppFuncs = {
-      columnRelOp: ppColumnRelOp,
+      RelOp: ppRelOp,
       subexp: ppSubExp
     };
 
@@ -112,13 +92,13 @@
       return ppExp(_exp);
     }
 
-    function mkEq(colName,cmpVal) {
-      _exp.args.push( mkColumnRelOp( "eq", colName, cmpVal ) );
+    function mkEq(lhs,rhs) {
+      _exp.args.push( mkRelOp( "eq", lhs, rhs ) );
       return this;
     }
 
-    function mkGt(colName,cmpVal) {
-      _exp.args.push( mkColumnRelOp( "gt", colName, cmpVal ) );
+    function mkGt(lhs,rhs) {
+      _exp.args.push( mkRelOp( "gt", lhs, rhs ) );
       return this;
     }
 
@@ -134,7 +114,11 @@
       "toString": function() {
         var rs = "[filter-exp (" + this.toSqlWhere() + ") ]";
         return rs;
-      }
+      },
+      "toJSON": function() {
+        return { filterExp: _exp };
+      },
+      "_getRep": function() {return _exp;},
     };
   }  
 
@@ -177,8 +161,8 @@
       return mkOperator( "table", tableName );
     }
 
-    function mkSelectExp( fexp ) {
-      return mkOperator( "select", fexp );
+    function mkFilterExp( fexp ) {
+      return mkOperator( "filter", fexp );
     }
 
     function mkProjectExp( cols ) {
@@ -204,7 +188,7 @@
 
     return {
       "table": mkTableRef,
-      "select": mkSelectExp,
+      "filter": mkFilterExp,
       "project": mkProjectExp,
       "toString": toString,
       "groupBy": mkGroupBy,
@@ -343,11 +327,145 @@
       return pf;
     };
 
+    /*
+     * compile the given filter expression with rest to the given schema
+     */
+    function compileFilterExp( schema, fexp ) {
+      // base expression (token) types:
+      var TOK_IDENT = 0;  // identifier
+      var TOK_STR = 1; // string literal
+      var TOK_INT = 2;
+
+      var identRE = /[a-zA-Z][a-zA-Z0-9]*/;
+      var strRE = /'([^']*)'/;
+      var intRE = /[0-9]+/;
+
+      function exactMatch( re, target ) {
+        var res = re.exec( target );
+        if ( res && (res[0].length==target.length) && res.index==0 )
+          return res;
+        return null;
+      }
+
+      function tokenize( str ) {
+        var ret = undefined;
+        var match;
+        if( match = exactMatch( identRE, str ) ) {
+          ret = { tt: TOK_IDENT, val: str }
+        } else if( match = exactMatch( strRE, str ) ) {
+          ret = { tt: TOK_STR, val: match[1] }
+        } else if( match = exactMatch( intRE, str ) ) {
+          ret = { tt: TOK_INT, val: parseInt( str ) }
+        } else {
+          throw new Error( "tokenize: unrecognized token [" + str + "]" );
+        }
+        return ret;
+      }
+
+      function compileAccessor( tok ) {
+        var af = undefined;
+        if( tok.tt == TOK_IDENT ) {
+          var idx = schema.columnIndex( tok.val );
+          if( typeof idx == "undefined" ) {
+            throw new Error( "compiling filter expression: Unknown column identifier '" + tok.val + "'" );
+          }
+          af = function( row ) {
+            return row[ idx ];
+          }
+        } else {
+          af = function( row ) {
+            return tok.val;
+          }
+        }
+        return af;
+      }
+
+      var relOpFnMap = {
+        "eq": function( l, r ) { return l==r; },
+      }
+
+      function compileRelOp( relop ) {
+        var tlhs = tokenize( relop.lhs );
+        var trhs = tokenize( relop.rhs );
+        var lhsef = compileAccessor( tlhs );
+        var rhsef = compileAccessor( trhs );
+        var cmpFn = relOpFnMap[ relop.relOp ];
+        if( !cmpFn ) {
+          throw new Error( "compileRelOp: unknown relational operator '" + relop.op + "'" );
+        }
+
+        function rf( row ) {
+          var lval = lhsef( row );
+          var rval = rhsef( row );
+          return cmpFn( lval, rval );
+        } 
+        return rf;
+      }
+
+      function compileSimpleExp( se ) {
+        if( se.type=="RelOp" ) {
+          return compileRelOp( se );
+        } else if( se.type=="subexp" ) {
+          return compileExp( se.exp );
+        } else {
+          throw new Error( "error compile simple expression " + JSON.stringify( se ) + ": unknown expr type");
+        }
+      }
+
+      function compileAndExp( argExps ) {
+        var argCFs = argExps.map( compileSimpleExp );
+
+        function cf( row ) {
+          for ( i = 0; i < argCFs.length; i++ ) {
+            var acf = argCFs[ i ];
+            var ret = acf( row );
+            if( !ret )
+              return false;
+          }
+          return true;
+        } 
+        return cf;
+      }
+      
+      function compileOrExp( argExps ) {
+        // TODO
+      }
+
+      function compileExp( exp ) {
+        var rep = exp._getRep();
+        var boolOp = rep.boolOp;  // top level
+        var cfn = undefined;
+        if( boolOp == "and" )
+          cfn = compileAndExp
+        else
+          cfn = compileOrExp;
+
+        return cfn( rep.args );
+      } 
+
+      return {
+        "evalFilterExp": compileExp( fexp )
+      };
+
+    }
 
     function filterImpl( fexp ) {
       function ff( tableData ) {
-        return tableData; // TODO!
+        console.log( "ff: ", fexp );
+
+        var ce = compileFilterExp( tableData.schema, fexp );
+
+        outRows = [];
+        for( var i = 0; i < tableData.rowData.length; i++ ) {
+          row = tableData.rowData[ i ];
+          if( ce.evalFilterExp( row ) )
+            outRows.push( row );
+        }
+
+        return { schema: tableData.schema, rowData: outRows };
       }
+
+      return ff;
     };
 
     // A simple op is a function from a full evaluated query result { schema, rowData } -> { schema, rowData }

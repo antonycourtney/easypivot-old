@@ -5,48 +5,7 @@
     }
   });
 
-/*
-  function AggTreeQueryExp( inChain, opRep ) {
-    var _expChain = inChain.slice();  // shallow copy inChain
-    if ( opRep )
-      _expChain.push( opRep );
 
-    function opExpToString() {
-      var rs = this.operator + " ( " + this.args.toString() + " )";
-      return rs;
-    }
-
-    // variadic function to make an operator applied to args node in AST
-    function mkOperator(opName)
-    {
-      var args = Array.prototype.slice.call(arguments);
-      args.shift();
-      var opRep = { operator:opName, args:args, toString: opExpToString };
-      var e = new AggTreeQueryExp( _expChain, opRep );
-      return e;
-    }
-
-    function mkRelTabRef( relTabQuery ) {
-      return mkOperator( "reltab", relTabQuery );
-    }
-
-    function mkVPivot( pivotColumns ) {
-      return mkOperator( "vpivot", pivotColumns );
-    }
-
-    return {
-      "reltab": mkRelTabRef,
-      "vpivot": mkVPivot,
-      "toString": toString,
-      "_getRep": function() { return _expChain; }
-    }
-  }
-
-  function createQueryExp( rtq ) {
-    var base = new AggTreeQueryExp( [] );
-    return base.reltab( rtq );
-  }
-*/
 
   function vpivotTree( rt, rtBaseQuery, pivotColumns ) {
 
@@ -82,11 +41,11 @@
         }
 
         if ( path.length > 0 ) {
-          var pred = rt.filter.and();
+          var pred = relTab.filter.and();
           for ( var i = 0; i < path.length; i++ ) {
-            pred = pred.and( pivotColumns[i], path[i] );
+            pred = pred.eq( pivotColumns[i], path[i] );
           }
-          pathQuery = pathQuery.filter( pred );
+          pathQuery = pathQuery.restrict( pred );
         }
 
         if( path.length < pivotColumns.length ) {

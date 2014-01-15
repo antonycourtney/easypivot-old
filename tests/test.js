@@ -37,19 +37,18 @@ asyncTest( "asyncTest: fetchURL with bad URL", function() {
 });
 
 test("basic reltab functionality", function() {
-  var rf = relTab.filter;
-  var e1 = rf.and().eq("x",25).eq("y","hello");
+  var e1 = relTab.and().eq("x",25).eq("y","'hello'");
   var s1 = e1.toSqlWhere();
   console.log( s1 );
   ok( s1 == "x=25 and y='hello'", "basic filter expression: " + s1 );
 
 
-  var e2 = rf.and()
-            .eq("x",30).eq("y","goodbye")
-            .subExp( rf.or().gt("z",50).gt("a","b") );
+  var e2 = relTab.and()
+            .eq("x",30).eq("y","'goodbye'")
+            .subExp( relTab.or().gt("z",50).gt("a","b") );
   var s2 = e2.toSqlWhere();
   console.log( s2 );  
-  ok( s2 == "x=30 and y='goodbye' and ( z>50 or a>'b' )", "filter with subexp and or: " + s2 );
+  ok( s2 == "x=30 and y='goodbye' and ( z>50 or a>b )", "filter with subexp and or: " + s2 );
 } );
 
 // Create a promise error handler that will call start() to fail an asyncTest
@@ -201,4 +200,17 @@ function onQ4Result( res ) {
   deepEqual( groupSum, tcoeSum, "tcoe sum after groupBy" );
 
   start();
+}
+
+var q5 = q1.filter( relTab.and().eq("Job", "'Executive Management'") );
+
+asyncTest( "asyncTest: evalQuery q5", 2, function() {
+  console.log ("evalQuery q5: ", q5.toString() );
+  console.log( q5 );
+  var p = rt.evalQuery( q5 );
+  p.then( onQ5Result ).fail( mkAsyncErrHandler( "evalQuery q5" ) );
+})
+
+function onQ5Result( res ) {
+  console.log( "onQ5Result: ", res );
 }
