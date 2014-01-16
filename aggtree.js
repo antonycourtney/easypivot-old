@@ -49,7 +49,7 @@
         }
 
         if( path.length < pivotColumns.length ) {
-          pathQuery = pathQuery.groupBy( [ pivotColumns[ path.length ] ], baseSchema.columns );
+          pathQuery = pathQuery.groupBy( [ pivotColumns[ path.length ] ], baseSchema.columns ); 
         }
 
         return pathQuery;  

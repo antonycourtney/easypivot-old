@@ -204,7 +204,7 @@ function onQ4Result( res ) {
 
 var q5 = q1.filter( relTab.and().eq("Job", "'Executive Management'") );
 
-asyncTest( "asyncTest: evalQuery q5", 2, function() {
+asyncTest( "asyncTest: evalQuery q5", 1, function() {
   console.log ("evalQuery q5: ", q5.toString() );
   console.log( q5 );
   var p = rt.evalQuery( q5 );
@@ -213,4 +213,37 @@ asyncTest( "asyncTest: evalQuery q5", 2, function() {
 
 function onQ5Result( res ) {
   console.log( "onQ5Result: ", res );
+  ok( res.rowData.length == 14, "expected row count after filter");
+
+  start();
 }
+
+function runQueryTest( q, nm, assertCount, cfn ) {
+
+  function onQueryTestResult( res ) {
+    console.log( "queryTest " + nm + " result: ", res);
+
+    if( typeof cfn != "undefined" ) {
+      cfn( res );
+    }
+
+    start();
+  }
+
+  function testFn() {
+    console.log( "queryTest " + nm + ": ", q.toString() );
+    console.log( q );
+    var p = rt.evalQuery( q );
+    p.then( onQueryTestResult ).fail( mkAsyncErrHandler( "runQueryTest " + nm ) );
+  }
+
+  if( typeof assertCount != undefined )
+    asyncTest( nm, assertCount, testFn )
+  else
+    asyncTest( nm, testFn ); 
+}
+
+
+var q6 = q1.mapColumns( { Name: { id: "EmpName", displayName: "Employee Name" } } );
+
+runQueryTest( q6, "mapColumns" );

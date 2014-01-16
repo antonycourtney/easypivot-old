@@ -34,6 +34,14 @@ asyncTest("basic aggTree functionality", 3, function() {
     var p2 = rt.evalQuery( q2 );
     p2.then( onQ2Result );
 
+
+    var q3 = tree0.applyPath( [ "Executive Management", "General Manager" ] );
+    console.log( "query for path /Executive Management/General Manager : ", q3.toString() );
+    console.log( q3 );
+
+    var p3 = rt.evalQuery( q3 );
+    p3.then( onQ3Result );
+
     // TODO: call start after all promises fulfilled.
 
   } );
@@ -58,6 +66,11 @@ function onQ1Result( res ) {
 
 function onQ2Result( res ) {
   console.log( "onQ2Result:", res );
+
+}
+
+function onQ3Result( res ) {
+  console.log( "onQ3Result: ", res );
 
   start();
 }

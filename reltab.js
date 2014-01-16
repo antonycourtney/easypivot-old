@@ -173,6 +173,10 @@
       return mkOperator( "groupBy", cols, aggs );
     }
 
+    function mkMapColumns( colMap ) {
+      return mkOperator( "mapColumns", colMap );
+    }
+
     function toString() {
       var es = [];
       for( var i = 0; i < _expChain.length; i++ ) {
@@ -192,6 +196,7 @@
       "project": mkProjectExp,
       "toString": toString,
       "groupBy": mkGroupBy,
+      "mapColumns": mkMapColumns,
       // "rowCount"
       // "join"
       // "sort"
@@ -625,10 +630,55 @@
       return gb;
     }
 
+    function mapColumnsImpl( cmap ) {
+      // TODO: check that all columns are columns of original schema,
+      // and that applying cmap will not violate any invariants on Schema....but need to nail down
+      // exactly what those invariants are first!
+
+      function mc( tableData ) {
+        var inSchema = tableData.schema;
+
+        var outColumns = [];
+        var outMetadata = {};
+        for ( var i = 0; i < inSchema.columns.length; i++ ) {
+          var inColumnId = inSchema.columns[ i ];
+          var inColumnInfo = inSchema.columnMetadata[ inColumnId ];
+          var cmapColumnInfo = cmap[ inColumnId ];
+          if( typeof cmapColumnInfo == "undefined" ) {
+            outColumns.push( inColumnId );
+            outMetadata[ inColumnId ] = inColumnInfo;
+          } else {
+            var outColumnId = cmapColumnInfo.id;
+            if( typeof outColumnId == "undefined" ) {
+              outColId = inColId;
+            }
+
+            // Form outColumnfInfo from inColumnInfo and all non-id keys in cmapColumnInfo:
+            var outColumnInfo = JSON.parse( JSON.stringify( inColumnInfo ) );
+            for( var key in cmapColumnInfo ) {
+              if( key!='id' && cmapColumnInfo.hasOwnProperty( key ) )
+                outColumnInfo[ key ] = cmapColumnInfo[ key ];
+            }
+            outMetadata[ outColumnId ] = outColumnInfo;
+            outColumns.push( outColumnId );
+          }
+        }
+        var outSchema = new Schema( { columns: outColumns, columnMetadata: outMetadata } );
+
+        // TODO: remap types as needed!
+
+        return { schema: outSchema, rowData: tableData.rowData };
+      }
+
+      return mc;
+    }
+
+
     var simpleOpImplMap = {
       "filter": filterImpl,
       "project": projectImpl,
-      "groupBy": groupByImpl
+      "groupBy": groupByImpl,
+      "mapColumns": mapColumnsImpl
     }
 
     // given a chain of simple operators (TableData -> TableData functions), compose them in to a
