@@ -245,5 +245,7 @@ function runQueryTest( q, nm, assertCount, cfn ) {
 
 
 var q6 = q1.mapColumns( { Name: { id: "EmpName", displayName: "Employee Name" } } );
-
 runQueryTest( q6, "mapColumns" );
+
+var q7 = q1.mapColumnsByIndex( { 0: { id: "EmpName" } } );
+runQueryTest( q7, "mapColumnsByIndex" );

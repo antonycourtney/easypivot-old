@@ -176,6 +176,12 @@
     function mkMapColumns( colMap ) {
       return mkOperator( "mapColumns", colMap );
     }
+    function mkMapColumnsByIndex( colMap ) {
+      return mkOperator( "mapColumnsByIndex", colMap );
+    }
+    function mkExtend( cols, colMetadata, colValues ) {
+      return mkOperator( "extend", cols, colMetadata, colValues );
+    }
 
     function toString() {
       var es = [];
@@ -197,6 +203,8 @@
       "toString": toString,
       "groupBy": mkGroupBy,
       "mapColumns": mkMapColumns,
+      "mapColumnsByIndex": mkMapColumnsByIndex,
+      "extend": mkExtend,
       // "rowCount"
       // "join"
       // "sort"
@@ -217,6 +225,17 @@
   function localRelTab() {
     var tableCache = {};
 
+    /*
+     * Terminology:  
+     *   A *Column* is a sequence of scalar values of a particular type, along with metadata
+     *   describing the column and how it should be rendered (such as the type of scalar values and display
+     *   name to use in the column header).
+     *   A *Column Id* uniquely identifies a particular column.  A column id is also used as
+     *   an index into the column metadata dictionary.
+     *   A *Table* is a sequence of columns.
+     *   A *Schema* is a sequence of Column Ids and a map from Column Id to Column Metadata info.
+     *   A *Column Index* is an ordinal index identifying the i-th column in a Table.
+     */
     function Schema( schemaData ) {
       var s = schemaData;
 
@@ -510,18 +529,17 @@
 
       function UniqAgg() {
         this.initial = true;        
-        this.str = undefined;
+        this.str = null;
       }
 
       UniqAgg.prototype.mplus = function( val ) {
-        if ( typeof val !== "undefined" ) {
-          if ( this.initial ) {
-            this.str = val;
-            this.initial = false; // our first defined val
-          } else {
-            if( this.str != val )
-              this.str = undefined; 
-          }
+        if ( this.initial && val != null ) {
+          // this is our first non-null value:
+          this.str = val;
+          this.initial = false;
+        } else {
+          if( this.str != val )
+            this.str = null; 
         }
       }
       UniqAgg.prototype.finalize = function() {
@@ -673,12 +691,87 @@
       return mc;
     }
 
+    function mapColumnsByIndexImpl( cmap ) {
+      // TODO: try to unify with mapColumns.  Probably means mapColumns will construct an argument to
+      // mapColumnsByIndex and use this impl
+      function mc( tableData ) {
+        var inSchema = tableData.schema;
+
+        var outColumns = [];
+        var outMetadata = {};
+        for ( var inIndex = 0; inIndex < inSchema.columns.length; inIndex++ ) {
+          var inColumnId = inSchema.columns[ inIndex ];
+          var inColumnInfo = inSchema.columnMetadata[ inColumnId ];
+          var cmapColumnInfo = cmap[ inIndex ];
+          if( typeof cmapColumnInfo == "undefined" ) {
+            outColumns.push( inColumnId );
+            outMetadata[ inColumnId ] = inColumnInfo;
+          } else {
+            var outColumnId = cmapColumnInfo.id;
+            if( typeof outColumnId == "undefined" ) {
+              outColumnId = inColumnId;
+            }
+
+            // Form outColumnfInfo from inColumnInfo and all non-id keys in cmapColumnInfo:
+            var outColumnInfo = JSON.parse( JSON.stringify( inColumnInfo ) );
+            for( var key in cmapColumnInfo ) {
+              if( key!='id' && cmapColumnInfo.hasOwnProperty( key ) )
+                outColumnInfo[ key ] = cmapColumnInfo[ key ];
+            }
+            outMetadata[ outColumnId ] = outColumnInfo;
+            outColumns.push( outColumnId );
+          }
+        }
+        var outSchema = new Schema( { columns: outColumns, columnMetadata: outMetadata } );
+
+        // TODO: remap types as needed!
+
+        return { schema: outSchema, rowData: tableData.rowData };
+      }
+
+      return mc;
+    }
+
+    function extendImpl( columns, columnMetadata, columnValues ) {
+
+      function ef( tableData ) {
+        var inSchema = tableData.schema;
+
+        var outCols = inSchema.columns.concat( columns );
+        var outMetadata = $.extend( {}, inSchema.columnMetadata, columnMetadata );
+        var outSchema = new Schema( { columns: outCols, columnMetadata: outMetadata } );
+
+        var extValues = [];
+        for( var i = 0; i < columns.length; i++ ) {
+          var colId = columns[ i ];
+          var val = columnValues && columnValues[ colId ];
+          if ( typeof val == "undefined" )
+            val = null;
+          extValues.push( val );
+        }
+
+        var outRows = [];
+        for( i = 0; i < tableData.rowData.length; i++ ) {
+          var inRow = tableData.rowData[ i ];
+          var outRow = inRow.concat( extValues );
+          outRows.push( outRow );
+        }
+
+        return { schema: outSchema, rowData: outRows };
+      }
+
+      return ef;
+    }
+
+
 
     var simpleOpImplMap = {
       "filter": filterImpl,
       "project": projectImpl,
       "groupBy": groupByImpl,
-      "mapColumns": mapColumnsImpl
+      "mapColumns": mapColumnsImpl,
+      "mapColumnsByIndex": mapColumnsByIndexImpl,
+      "extend": extendImpl,
     }
 
     // given a chain of simple operators (TableData -> TableData functions), compose them in to a

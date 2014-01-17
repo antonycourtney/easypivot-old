@@ -18,19 +18,9 @@
     function withBaseRes( baseRes ) {
       var baseSchema = baseRes.schema;
 
-      /*
-      // Prepend pivot column:
-      // ??? Do we want to do the schema manipulation here at all?  Perhaps we should do it at
-      // flattening level instead...
-      // TODO: ensure pivot column doesn't already exist / generate a fresh name!
-      var cmd = baseSchema.columnMetadata.slice();
-      var cols = baseSchema.columns.slice();
-      cmd["_pivot"] = { "type": "text", "displayName": " " };
-      cols.unshift( "_pivot" );
-      var resSchema = new rt.Schema( { "columns": cols, "columnMetadata": cmd } );
-      */
       function applyPath( path ) {
-        // TODO: Think about how to use rollupBy and cache result for efficiency
+        // TODO: Think about how to use rollupBy or a smaller number of groupBys that get chopped up 
+        // and cache result for efficiency
 
         // queries are immutable so no need to clone:
         var pathQuery = rtBaseQuery;
@@ -48,11 +38,22 @@
           pathQuery = pathQuery.filter( pred );
         }
 
+        var pivotColumnInfo = { id: "_pivot", type: "text", displayName: " " };
+
         if( path.length < pivotColumns.length ) {
-          pathQuery = pathQuery.groupBy( [ pivotColumns[ path.length ] ], baseSchema.columns ); 
+          pathQuery = pathQuery
+                        .groupBy( [ pivotColumns[ path.length ] ], baseSchema.columns )
+                        .mapColumnsByIndex( { 0 : pivotColumnInfo } ); 
+        } else {
+          // leaf level
+          var outCols = [ "_pivot" ];
+          outCols = outCols.concat( baseSchema.columns );
+          pathQuery = pathQuery
+                        .extend( [ "_pivot" ], { "_pivot": { type: "text", displayName: " " } } )
+                        .project( outCols );
         }
 
-        return pathQuery;  
+        return pathQuery;
       }
 
       return { 
