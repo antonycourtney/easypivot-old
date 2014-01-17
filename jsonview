@@ -13,4 +13,4 @@ args = argParser.parse_args()
 jsonFilePath = args.jsonfile[0]
 bnm = os.path.basename( jsonFilePath )
 (tableName,_)= os.path.splitext( bnm )
-tableserver.serveJSONFile( tableName )
+tableserver.serveJSONFile( tableName, "table_viewer.html" )

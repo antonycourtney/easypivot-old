@@ -148,13 +148,15 @@ class TableResource(object):
 
 # Use simple templating to inject table name extracted from request params back in to HTML on client side: 
 class TableViewerResource(object):
+    def __init__( self, templateFileName):
+        self.templateFileName = templateFileName
 
     @cherrypy.expose
     def default(self, table_name=''):
         return self.to_html( table_name )
 
     def to_html(self, table_name):
-        tmpl = lookup.get_template("table_viewer.html")
+        tmpl = lookup.get_template( self.templateFileName )
         return tmpl.render(table_name=table_name)
 
 
@@ -173,8 +175,8 @@ class Root(object):
         self.tables = tables
         self.table_viewer = table_viewer
 
-def startWebServer( dbName, tableName ):
-    root = Root( TableResource( dbName ), TableViewerResource() )
+def startWebServer( dbName, tableName, templateFileName ):
+    root = Root( TableResource( dbName ), TableViewerResource( templateFileName ) )
     dbTable = PagedDbTable( dbName, tableName )
     cherrypy.config.update( {'log.screen': False })
     cherrypy.engine.subscribe('start', lambda : open_page( tableName ) )
@@ -208,8 +210,8 @@ class TVRoot(object):
     def __init__( self, table_viewer ):
         self.table_viewer = table_viewer
 
-def serveJSONFile( tableName ):
-    root = TVRoot( TableViewerResource() )
+def serveJSONFile( tableName, templateFileName ):
+    root = TVRoot( TableViewerResource( templateFileName ) )
     cherrypy.config.update( {'log.screen': False })
     cherrypy.engine.subscribe('start', lambda : open_page( tableName ) )
     cherrypy.quickstart( root, '/', config)
