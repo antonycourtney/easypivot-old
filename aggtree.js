@@ -6,7 +6,6 @@
   });
 
 
-
   function vpivotTree( rt, rtBaseQuery, pivotColumns ) {
 
     // obtain schema for base query:
@@ -53,6 +52,9 @@
                         .project( outCols );
         }
 
+        // TODO: Should we optionally also insert _childCount and _leafCount columns?
+        // _childCount would count next level of groupBy, _leafCount would count pathQuery at point of filter.
+        // Both of these are potentially quite expensive unless we are very careful in the implementation.
         return pathQuery;
       }
 

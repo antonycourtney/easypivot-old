@@ -217,13 +217,14 @@
     var onDataLoading = new Slick.Event();
     var onDataLoaded = new Slick.Event();
 
-    function setGrouping( columnInfo ) {
+    function setGrouping( header) {
         var aggs = [];
 
-        for( i = 0; i < columnInfo.length; i++ ) {
-          var ci = columnInfo[i];
-          if( ci.type=="integer" || ci.type=="real" ) {
-            aggs.push( new Slick.Data.Aggregators.Sum( ci.field ) );
+        for( i = 0; i < header.columns.length; i++ ) {
+          var colId = header.columns[i];
+          var cm = header.columnMetadata[ colId ];
+          if( cm.type=="integer" || cm.type=="real" ) {
+            aggs.push( new Slick.Data.Aggregators.Sum( colId ) );
           }
         }
 
@@ -273,16 +274,17 @@
 
       function onGet( error, data) {
         console.log( data );
-        var columnInfo = data.columnInfo;
+        var header = data[ 0 ];
+        var body = data[ 1 ];
 
-        var columnNames = columnInfo.map(function (ci) { return ci.field; });
+        var columnIds = header.columns;
 
         rows = [];
-        for( var i = 0; i < data.rowData.length; i++ ) {
-          rowArray = data.rowData[ i ];
+        for( var i = 0; i < body.rowData.length; i++ ) {
+          rowArray = body.rowData[ i ];
           rowDict = { 'id': "row_" + i }; 
           for( var col = 0; col < rowArray.length; col++ ) {
-            rowDict[ columnNames[ col ] ] = rowArray[ col ];
+            rowDict[ columnIds[ col ] ] = rowArray[ col ];
           }
           rows[ i ] = rowDict;
         }
@@ -290,8 +292,8 @@
         firstRow = rows[0];
         console.log( firstRow );
         dataView.setItems( rows );
-        setGrouping( columnInfo );
-        response = { columnInfo: columnInfo, results: rows };
+        setGrouping( header );
+        response = { header: header, results: rows };
         cbfn( response );
       }
 
@@ -455,28 +457,35 @@
           }
         }
       }
-      var ci = response.columnInfo;
-      for (var i = 0; i < ci.length; i++) {
-        ci[i].toolTip = ci[i].name;
-        ci[i].sortable = true;
-        ci[i].width = colWidths[ ci[i].field ];
+      var hdr = response.header;
+      var gridCols = [];
+      for (var i = 0; i < hdr.columns.length; i++) {
+        var colId = hdr.columns[ i ];
+        var cmd = hdr.columnMetadata[ colId ];
+        var ci = { id: colId, field: colId };
+        var displayName = cmd.displayName || colId;
+        ci.name = displayName;
+        ci.toolTip = displayName;
+        ci.sortable = true;
+        ci.width = colWidths[ colId ];
         if( i==ci.length - 1 ) {
           // pad out last column to allow for dynamic scrollbar
-          ci[i].width += GRIDWIDTHPAD;
+          ci.width += GRIDWIDTHPAD;
         }
-        if (ci[i].type=='integer') {
-          ci[i].formatter = function ( r, c, v, cd, dc ) {
+        if (ci.type=='integer') {
+          ci.formatter = function ( r, c, v, cd, dc ) {
             return intFormatter( v );
           }
-          ci[i].groupTotalsFormatter = sumTotalsFormatter;          
-        } else if (ci[i].type=='real') {
-          ci[i].groupTotalsFormatter = sumTotalsFormatter;
+          ci.groupTotalsFormatter = sumTotalsFormatter;          
+        } else if (ci.type=='real') {
+          ci.groupTotalsFormatter = sumTotalsFormatter;
         }
 
         // console.log( "column ", i, " name: '", ci[i].name, "', width: ", ci[i].width );
-        gridWidth += ci[i].width;
+        gridWidth += ci.width;
+        gridCols.push( ci );
       }
-      createGrid( ci );
+      createGrid( gridCols );
 
       $(container).css( 'width', gridWidth+'px' );
     };
