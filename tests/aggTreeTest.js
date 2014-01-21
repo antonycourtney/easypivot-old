@@ -54,7 +54,7 @@ function onQ1Result( res ) {
   console.log( "schema cols: ", res.schema.columns );
   console.log( "rowData length: ", res.rowData.length );
 
-  var expCols = ["_pivot", "Job", "Title", "Union", "Name", "Base", "TCOE"];
+  var expCols = [ "_depth", "_pivot", "Job", "Title", "Union", "Name", "Base", "TCOE"];
 
   deepEqual( res.schema.columns, expCols, "Q1 schema columns" );
   deepEqual( res.rowData.length, 19, "Q1 rowData length" );

@@ -37,24 +37,33 @@
           pathQuery = pathQuery.filter( pred );
         }
 
-        var pivotColumnInfo = { id: "_pivot", type: "text", displayName: " " };
+        var pivotColumnInfo = { id: "_pivot", type: "text" };
+
+        var outCols = [ "_depth", "_pivot" ];
+        outCols = outCols.concat( baseSchema.columns );
 
         if( path.length < pivotColumns.length ) {
           pathQuery = pathQuery
                         .groupBy( [ pivotColumns[ path.length ] ], baseSchema.columns )
-                        .mapColumnsByIndex( { 0 : pivotColumnInfo } ); 
+                        .mapColumnsByIndex( { 0 : pivotColumnInfo } )
+                        .extendColumn( "_depth", { type: "integer" }, path.length )
+                        .project( outCols ); 
         } else {
           // leaf level
-          var outCols = [ "_pivot" ];
-          outCols = outCols.concat( baseSchema.columns );
           pathQuery = pathQuery
-                        .extend( [ "_pivot" ], { "_pivot": { type: "text", displayName: " " } } )
-                        .project( outCols );
+                        .extendColumn( "_pivot", { type: "text" }, null );
         }
 
-        // TODO: Should we optionally also insert _childCount and _leafCount columns?
+        // add _depth column and project to get get column order correct:
+        pathQuery = pathQuery
+                      .extendColumn( "_depth", { type: "integer" }, path.length )
+                      .project( outCols ); 
+
+
+        // TODO: Should we optionally also insert _childCount, _leafCount and _depth columns?
+        // _depth is trivial.
         // _childCount would count next level of groupBy, _leafCount would count pathQuery at point of filter.
-        // Both of these are potentially quite expensive unless we are very careful in the implementation.
+        // These latter two are potentially quite expensive; need to be careful in the implementation.
         return pathQuery;
       }
 

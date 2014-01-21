@@ -1,0 +1,16 @@
+#!/usr/bin/python
+"""
+Simple json file viewer for viewing json files generated with csvtojson
+"""
+
+import argparse
+import tableserver
+import os
+
+argParser = argparse.ArgumentParser(description='interactively view a JSON file in a local web browser')
+argParser.add_argument('jsonfile',metavar='FILE',type=str, nargs=1, help='path to JSON file')
+args = argParser.parse_args()
+jsonFilePath = args.jsonfile[0]
+bnm = os.path.basename( jsonFilePath )
+(tableName,_)= os.path.splitext( bnm )
+tableserver.serveJSONFile( tableName, "pivot_viewer.html" )

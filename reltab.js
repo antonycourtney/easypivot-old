@@ -182,6 +182,14 @@
     function mkExtend( cols, colMetadata, colValues ) {
       return mkOperator( "extend", cols, colMetadata, colValues );
     }
+    // extendColumn -- convenience for extending just a single column:
+    function mkExtendColumn( colId, colmd, val ) {
+      var mdMap = {}; 
+      var valMap = {};
+      mdMap[ colId ] = colmd;
+      valMap[ colId ] = val;
+      return mkOperator( "extend", [ colId ], mdMap, valMap );
+    }
 
     function toString() {
       var es = [];
@@ -205,6 +213,7 @@
       "mapColumns": mkMapColumns,
       "mapColumnsByIndex": mkMapColumnsByIndex,
       "extend": mkExtend,
+      "extendColumn": mkExtendColumn,
       // "rowCount"
       // "join"
       // "sort"
@@ -648,6 +657,11 @@
       return gb;
     }
 
+    /*
+     * map the display name or type of columns.
+     * TODO: perhaps split this into different functions since most operations are only schema transformations,
+     * but type mapping will involve touching all input data.
+     */
     function mapColumnsImpl( cmap ) {
       // TODO: check that all columns are columns of original schema,
       // and that applying cmap will not violate any invariants on Schema....but need to nail down
@@ -732,6 +746,9 @@
       return mc;
     }
 
+    /*
+     * extend a RelTab by adding a column with a constant value.
+     */
     function extendImpl( columns, columnMetadata, columnValues ) {
 
       function ef( tableData ) {
