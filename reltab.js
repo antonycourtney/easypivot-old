@@ -254,6 +254,12 @@
         return md.type;
       }
 
+      s.displayName = function( colId ) {
+        var dn = s.columnMetadata[ colId ].displayName || colId;
+
+        return dn;
+      }
+
       var columnIndices = {};
       for ( var i = 0; i < schemaData.columns.length; i++ ) {
         var col = schemaData.columns[ i ];

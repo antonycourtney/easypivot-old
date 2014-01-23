@@ -51,27 +51,7 @@ test("basic reltab functionality", function() {
   ok( s2 == "x=30 and y='goodbye' and ( z>50 or a>b )", "filter with subexp and or: " + s2 );
 } );
 
-// Create a promise error handler that will call start() to fail an asyncTest
-function mkAsyncErrHandler( msg ) {
-  function handler( err ) {
-    console.error( msg + ": unexpected promise failure.  Error: %O ", err );
-    start();
-  }
-  return handler;
-}
-
-function columnSum( tableData, columnId ) {
-  var sum = 0;
-
-  var colIndex = tableData.schema.columnIndex( columnId );
-  for ( var i=0; i < tableData.rowData.length; i++ ) {
-    sum += tableData.rowData[i][colIndex];
-  };
-  return sum;
-}
-
 var tcoeSum = 0;
-
 
 function onQ1Result( res ) {
   console.log( "onQ1Result: ", res );
@@ -218,30 +198,6 @@ function onQ5Result( res ) {
   start();
 }
 
-function runQueryTest( q, nm, assertCount, cfn ) {
-
-  function onQueryTestResult( res ) {
-    console.log( "queryTest " + nm + " result: ", res);
-
-    if( typeof cfn != "undefined" ) {
-      cfn( res );
-    }
-
-    start();
-  }
-
-  function testFn() {
-    console.log( "queryTest " + nm + ": ", q.toString() );
-    console.log( q );
-    var p = rt.evalQuery( q );
-    p.then( onQueryTestResult ).fail( mkAsyncErrHandler( "runQueryTest " + nm ) );
-  }
-
-  if( typeof assertCount != undefined )
-    asyncTest( nm, assertCount, testFn )
-  else
-    asyncTest( nm, testFn ); 
-}
 
 
 var q6 = q1.mapColumns( { Name: { id: "EmpName", displayName: "Employee Name" } } );

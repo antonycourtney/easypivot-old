@@ -17,6 +17,18 @@
     function withBaseRes( baseRes ) {
       var baseSchema = baseRes.schema;
 
+      var outCols = [ "_depth", "_pivot" ];
+      outCols = outCols.concat( baseSchema.columns );
+
+      var rootQuery = rtBaseQuery
+                    .groupBy( [], baseSchema.columns )
+                    .extendColumn( "_pivot", { type: "text" }, null ) 
+                    .extendColumn( "_depth", { type: "integer" }, 0 )
+                    .project( outCols ); 
+
+      /*
+       * returns a query for the children of the specified path:
+       */
       function applyPath( path ) {
         // TODO: Think about how to use rollupBy or a smaller number of groupBys that get chopped up 
         // and cache result for efficiency
@@ -37,17 +49,12 @@
           pathQuery = pathQuery.filter( pred );
         }
 
-        var pivotColumnInfo = { id: "_pivot", type: "text" };
-
-        var outCols = [ "_depth", "_pivot" ];
-        outCols = outCols.concat( baseSchema.columns );
+        var pivotColumnInfo = { id: "_pivot", type: "text", displayName: "_pivot" };
 
         if( path.length < pivotColumns.length ) {
           pathQuery = pathQuery
                         .groupBy( [ pivotColumns[ path.length ] ], baseSchema.columns )
                         .mapColumnsByIndex( { 0 : pivotColumnInfo } )
-                        .extendColumn( "_depth", { type: "integer" }, path.length )
-                        .project( outCols ); 
         } else {
           // leaf level
           pathQuery = pathQuery
@@ -56,7 +63,7 @@
 
         // add _depth column and project to get get column order correct:
         pathQuery = pathQuery
-                      .extendColumn( "_depth", { type: "integer" }, path.length )
+                      .extendColumn( "_depth", { type: "integer" }, path.length + 1 )
                       .project( outCols ); 
 
 
@@ -69,6 +76,7 @@
 
       return { 
         // schema: resSchema,
+        rootQuery: rootQuery,
         applyPath: applyPath 
       };
     }
