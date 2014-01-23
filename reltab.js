@@ -262,8 +262,36 @@
         return this.columnIndices[ colId ];
       }
 
+      s.compatCheck = function( sb ) {
+        if( this.columns.length != sb.columns.length ) {
+          throw new SchemaError( "incompatible schema: columns length mismatch", this, sb );
+        }
+        for( var i = 0; i < this.columns.length; i++ ) {
+          var colId = this.columns[ i ];
+          var bColId = sb.columns[ i ];
+          if( colId !== bColId ) {
+            throw new SchemaError( "incompatible schema: expected '" + colId + "', found '" + bColId + "'", this, sb );
+          }
+          var colType = this.columnMetadata[ colId ].type;
+          var bColType = sb.columnMetadata[ bColId ].type;
+          if( colType !== bColType ) {
+            throw new SchemaError( "mismatched column types for col '" + colId + "': " + colType + ", " + bColType, this, sb );
+          }
+        }
+        // success!
+      }
+
       return s;  // for now
     }
+
+    function SchemaError( message, s1, s2 ) {
+      this.message = message;
+      this.s1 = s1;
+      this.s2 = s2;
+    }
+
+    SchemaError.prototype = new Error();
+
 
     function TableRep( tableData ) {
       var schema = new Schema( tableData[ 0 ] );
@@ -786,7 +814,26 @@
       return ef;
     }
 
+    /*
+     * concat tables
+     */
+    function concatImpl() {
+      function cf( subTables ) {
+        var tbl = subTables[ 0 ];
+        var res = { schema: tbl.schema, rowData: tbl.rowData };
+        for ( i = 1; i < subTables.length; i++ ) {
+          tbl = subTables[ i ];
+          // check schema compatibility:
+          res.schema.compatCheck( tbl.schema );
 
+          res.rowData = res.rowData.concat( tbl.rowData );
+        }
+
+        return res;
+      }
+
+      return cf;
+    }      
 
     var simpleOpImplMap = {
       "filter": filterImpl,
@@ -795,7 +842,7 @@
       "mapColumns": mapColumnsImpl,
       "mapColumnsByIndex": mapColumnsByIndexImpl,
       "extend": extendImpl,
-      // "concat": concatImpl,
+      "concat": concatImpl,
     }
 
 
@@ -873,11 +920,7 @@
 
 
     function evalQuery( queryExp ) {
-      /* Note to self, 22Jan: Now that we have tableArgs and valArgs can probably do 
-       * a uniform tree walk down tableArgs.
-       * But really we should do value numbering pretty much straight away to achieve common 
-       * subExp elimination.
-       */
+      // use value numbering to build up a map of common subexpression and then evaluate that
       var cseMap = { invMap: {}, valExps: [], promises: [] };
       var queryIdent = buildCSEMap( cseMap, queryExp._rep );     
 
@@ -887,21 +930,6 @@
 
       var opRep = cseMap.valExps[ queryIdent ];  
 
-      /*
-
-      var expChain = queryExp._getRep().slice();
-      var opImpl = null;
-
-      if ( expChain.length < 1 ) {
-        throw new Error( "evalQuery: empty query chain" );
-      }
-
-      // TODO: Deal with join(), which will have more than one source table!
-      var baseExp = expChain.shift();
-      opImpl = getBaseOpImpl( baseExp );
-
-      return opImpl.then( evalSimpleExpChain( expChain ) )
-      */
       return null;
     }
 

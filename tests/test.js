@@ -184,25 +184,16 @@ function onQ4Result( res ) {
 }
 
 var q5 = q1.filter( relTab.and().eq("Job", "'Executive Management'") );
-
-asyncTest( "asyncTest: evalQuery q5", 1, function() {
-  console.log ("evalQuery q5: ", q5.toString() );
-  console.log( q5 );
-  var p = rt.evalQuery( q5 );
-  p.then( onQ5Result ).fail( mkAsyncErrHandler( "evalQuery q5" ) );
-})
-
-function onQ5Result( res ) {
-  console.log( "onQ5Result: ", res );
+runQueryTest( q5, "basic filter", 1, function( res ) {
   ok( res.rowData.length == 14, "expected row count after filter");
-
-  start();
-}
-
-
+} );
 
 var q6 = q1.mapColumns( { Name: { id: "EmpName", displayName: "Employee Name" } } );
 runQueryTest( q6, "mapColumns" );
 
 var q7 = q1.mapColumnsByIndex( { 0: { id: "EmpName" } } );
 runQueryTest( q7, "mapColumnsByIndex" );
+
+var q8 = q5.concat( q1.filter( relTab.and().eq("Job", "'Safety'") ) );
+runQueryTest( q8, "concat" );
+
