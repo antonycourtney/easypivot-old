@@ -3,7 +3,7 @@
 var rt = relTab.local();
 
 
-var q0 = relTab.query().table( "bart-comp-all" ).project( [ "Job", "Title", "Union", "Name", "Base", "TCOE" ]);
+var q0 = relTab.query.table( "bart-comp-all" ).project( [ "Job", "Title", "Union", "Name", "Base", "TCOE" ]);
 var p0 = aggTree.vpivot( rt, q0, ["Job", "Title" ] );
 
 console.log( "called vpivot, got promise result..." );

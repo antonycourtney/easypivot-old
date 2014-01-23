@@ -67,10 +67,10 @@
                       .project( outCols ); 
 
 
-        // TODO: Should we optionally also insert _childCount, _leafCount and _depth columns?
-        // _depth is trivial.
-        // _childCount would count next level of groupBy, _leafCount would count pathQuery at point of filter.
-        // These latter two are potentially quite expensive; need to be careful in the implementation.
+        // TODO: Should we optionally also insert _childCount and _leafCount ?
+        // _childCount would count next level of groupBy, _leafCount would do count() at point of calculating
+        // filter for current path (before doing groupBy).
+        // These can certainly have non-trivial costs to calculate
         return pathQuery;
       }
 

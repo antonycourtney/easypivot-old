@@ -3,7 +3,9 @@
     relTab: {
       local: localRelTab,
       remote: relTabClient,
-      query: createQueryExp,
+      query: {
+        table: createTableQueryExp
+      },
       // filter support:
       and: createFilterAndExp,
       or: createFilterOrExp,
@@ -136,8 +138,81 @@
    * Each call to ctor appends opRep to _expChain.
    * Constructor not exposed in user API
    */
+  function mkOpRep( opName, valArgs, tableArgs )
+  {
+    function opRepToString() {
+      var rs = this.operator + "( [ " + this.tableArgs.toString() + " ], " + JSON.stringify( this.valArgs ) + " )";
+      return rs;
+    }
+    var opRep = { operator: opName, tableArgs: tableArgs, valArgs: valArgs, toString: opRepToString };
+    return opRep;
+  };
+
+  function mkQueryExp( opRep ) {
+
+    function mkOperator( opName, valArgs, /* optional */ tableArgs ) {
+      tableArgs = tableArgs || [];
+      tableArgs.unshift( opRep );
+      var nextRep = mkOpRep( opName, valArgs, tableArgs );
+      return mkQueryExp( nextRep );
+    }
+
+    function mkFilterExp( fexp ) {
+      return mkOperator( "filter", [ fexp ] );
+    } 
+
+    function mkProjectExp( cols ) {
+      return mkOperator( "project", [ cols ] );
+    }
+
+    function mkGroupBy( cols, aggs ) {
+      return mkOperator( "groupBy", [ cols, aggs ] );
+    }
+
+    function mkMapColumns( colMap ) {
+      return mkOperator( "mapColumns", [ colMap ] );
+    }
+    function mkMapColumnsByIndex( colMap ) {
+      return mkOperator( "mapColumnsByIndex", [ colMap ] );
+    }
+    function mkExtend( cols, colMetadata, colValues ) {
+      return mkOperator( "extend", [ cols, colMetadata, colValues ] );
+    }
+
+    // extendColumn -- convenience for extending just a single column:
+    function mkExtendColumn( colId, colmd, val ) {
+      var mdMap = {}; 
+      var valMap = {};
+      mdMap[ colId ] = colmd;
+      valMap[ colId ] = val;
+      return mkOperator( "extend", [ [ colId ], mdMap, valMap ] );
+    }
+
+    function mkConcat( qexp ) {
+      return mkOperator( "concat", [], [ qexp._rep ] );
+    }
+
+    function toString() {
+      return opRep.toString();
+    }
+
+    return {
+      "_rep": opRep,
+      "filter": mkFilterExp,
+      "project": mkProjectExp,
+      "toString": toString,
+      "groupBy": mkGroupBy,
+      "mapColumns": mkMapColumns,
+      "mapColumnsByIndex": mkMapColumnsByIndex,
+      "extend": mkExtend,
+      "extendColumn": mkExtendColumn,
+      "concat": mkConcat,
+    };   
+  }
+
+/*
   // constructor
-  function RelTabQueryExp(inChain, opRep) {
+  function RelTabQueryExp( opRep ) {
     var _expChain = inChain.slice(); // shallow copy inChain
     if( opRep )
       _expChain.push( opRep );
@@ -147,15 +222,6 @@
       return rs;
     }
 
-    // variadic function to make an operator applied to args node in AST
-    function mkOperator(opName)
-    {
-      var args = Array.prototype.slice.call(arguments);
-      args.shift();
-      var opRep = { operator:opName, args:args, toString: opExpToString };
-      var e = new RelTabQueryExp( _expChain, opRep );
-      return e;
-    }
 
     function mkTableRef( tableName ) {
       return mkOperator( "table", tableName );
@@ -182,14 +248,10 @@
     function mkExtend( cols, colMetadata, colValues ) {
       return mkOperator( "extend", cols, colMetadata, colValues );
     }
-    // extendColumn -- convenience for extending just a single column:
-    function mkExtendColumn( colId, colmd, val ) {
-      var mdMap = {}; 
-      var valMap = {};
-      mdMap[ colId ] = colmd;
-      valMap[ colId ] = val;
-      return mkOperator( "extend", [ colId ], mdMap, valMap );
+    function mkConcat( qexp ) {
+      return mkOperator( "concat", qexp );
     }
+
 
     function toString() {
       var es = [];
@@ -205,15 +267,7 @@
     }
 
     return {
-      "table": mkTableRef,
-      "filter": mkFilterExp,
-      "project": mkProjectExp,
-      "toString": toString,
-      "groupBy": mkGroupBy,
-      "mapColumns": mkMapColumns,
-      "mapColumnsByIndex": mkMapColumnsByIndex,
-      "extend": mkExtend,
-      "extendColumn": mkExtendColumn,
+      "_table": mkTableRef,
       // "rowCount"
       // "join"
       // "sort"
@@ -222,9 +276,13 @@
       "_getRep": getRep,
     };
   }
+*/
 
-  function createQueryExp() {
-    return new RelTabQueryExp([]);
+  // Create base of a query expression chain by starting with "table":
+  function createTableQueryExp( tableName ) {
+    var opRep = mkOpRep( "table", [ tableName ], [] );
+    var ret = mkQueryExp( opRep );
+    return ret;
   }
 
 
@@ -353,7 +411,9 @@
         return { "schema": ns, "permutation": perm };
       }
 
-      function pf( tableData ) {
+      function pf( subTables ) {
+        var tableData = subTables[ 0 ];
+
         var ps = calcState( tableData.schema );
         function permuteOneRow( row ) {
           return d3.permute( row, ps.permutation);
@@ -489,7 +549,8 @@
     }
 
     function filterImpl( fexp ) {
-      function ff( tableData ) {
+      function ff( subTables ) {
+        var tableData = subTables[ 0 ];
         console.log( "ff: ", fexp );
 
         var ce = compileFilterExp( tableData.schema, fexp );
@@ -592,7 +653,8 @@
         "text": UniqAgg
       }
 
-      function gb( tableData ) {
+      function gb( subTables ) {
+        var tableData = subTables[ 0 ];
 
         console.log( "gb: enter: cols.length ", cols.length );
 
@@ -674,6 +736,7 @@
       // exactly what those invariants are first!
 
       function mc( tableData ) {
+        var tableData = subTables[ 0 ];
         var inSchema = tableData.schema;
 
         var outColumns = [];
@@ -714,7 +777,8 @@
     function mapColumnsByIndexImpl( cmap ) {
       // TODO: try to unify with mapColumns.  Probably means mapColumns will construct an argument to
       // mapColumnsByIndex and use this impl
-      function mc( tableData ) {
+      function mc( subTables ) {
+        var tableData = subTables[ 0 ];
         var inSchema = tableData.schema;
 
         var outColumns = [];
@@ -757,7 +821,11 @@
      */
     function extendImpl( columns, columnMetadata, columnValues ) {
 
-      function ef( tableData ) {
+      /*
+       * TODO: What are the semantics of doing an extend on a column that already exists?  Decide and spec. it!
+       */
+      function ef( subTables ) {
+        var tableData = subTables[ 0 ];
         var inSchema = tableData.schema;
 
         var outCols = inSchema.columns.concat( columns );
@@ -795,7 +863,12 @@
       "mapColumns": mapColumnsImpl,
       "mapColumnsByIndex": mapColumnsByIndexImpl,
       "extend": extendImpl,
+      // "concat": concatImpl,
     }
+
+/*
+
+DEAD!
 
     // given a chain of simple operators (TableData -> TableData functions), compose them in to a
     // TableData -> TableData function 
@@ -821,24 +894,98 @@
 
       return af;
     }
+*/
+
+    /*
+     * Evaluate a non-base expression from its sub-tables
+     */
+   function evalExpr( opRep, subTables ) {
+    var opImpl = simpleOpImplMap[ opRep.operator ];
+    var valArgs = opRep.valArgs.slice();
+    var impFn = opImpl.apply( null, valArgs );
+    var tres = impFn( subTables );
+    return tres;      
+   }   
 
 
-    // map from operator names to implementation factories
+
+    // base expressions:  Do not have any sub-table arguments, and produce a promise<TableData>
     var baseOpImplMap = {
       "table": tableRefImpl
     };
 
-    function getBaseOpImpl( exp ) {
+    function evalBaseExpr( exp ) {
       var opImpl = baseOpImplMap[ exp.operator ];
       if ( !opImpl ) {
-        throw new Error( "getBaseOpImpl: unknown operator '" + exp.operator + "'" );
+        throw new Error( "evalBaseExpr: unknown primitive table operator '" + exp.operator + "'" );
       }
-      var args = exp.args.slice();
+      var args = exp.valArgs.slice();
       var opRes = opImpl.apply( null, args );
       return opRes;
     }
 
+    /* evaluate the specified table value in the CSE Map.
+     * Returns: promise for the result value
+     */
+    function evalCSEMap( cseMap, tableId ) {
+      var resp = cseMap.promises[ tableId ];
+      if( typeof resp == "undefined" ) {
+        // no entry yet, make one:
+        var opRep = cseMap.valExps[ tableId ];
+
+        var subTables = []; // array of promises:
+
+        if( opRep.tableNums.length > 0 ) {
+          // dfs eval of sub-tables:
+          subTables = opRep.tableNums.map( function( tid ) { return evalCSEMap( cseMap, tid ); } );
+          resp = Q.all( subTables ).then( function( tvals ) { return evalExpr( opRep, tvals ); } );
+        } else {
+          resp = evalBaseExpr( opRep );
+        }
+        cseMap.promises[ tableId ] = resp;
+      }
+      return resp;
+    }
+
+    /*
+     * use simple depth-first traversal and value numbering in cseMap to
+     * identify common table subexpressions.
+     */
+    function buildCSEMap( cseMap, opRep ) {
+      var tableNums = opRep.tableArgs.map( function( e ) { return buildCSEMap( cseMap, e ); } );
+      var expKey = opRep.operator + "( [ " + tableNums.toString() + " ], " + JSON.stringify( opRep.valArgs ) + " )";
+      var valNum = cseMap.invMap[ expKey ];
+      if( typeof valNum == "undefined" ) {
+        // no entry, need to add it:
+        // let's use opRep as prototype, and put tableNums in the new object:
+        var expRep = Object.create( opRep );
+        expRep.tableNums = tableNums;
+        var valNum = cseMap.valExps.length;
+        cseMap.valExps[ valNum ] = expRep;
+        cseMap.invMap[ expKey ] = valNum;
+      } // else: cache hit! nothing to do
+
+      return valNum;
+    }
+
+
     function evalQuery( queryExp ) {
+      /* Note to self, 22Jan: Now that we have tableArgs and valArgs can probably do 
+       * a uniform tree walk down tableArgs.
+       * But really we should do value numbering pretty much straight away to achieve common 
+       * subExp elimination.
+       */
+      var cseMap = { invMap: {}, valExps: [], promises: [] };
+      var queryIdent = buildCSEMap( cseMap, queryExp._rep );     
+
+      console.log( "evalQuery after buildCSEMap: queryIdent: ", queryIdent, ", map: ", cseMap );
+
+      return evalCSEMap( cseMap, queryIdent );
+
+      var opRep = cseMap.valExps[ queryIdent ];  
+
+      /*
+
       var expChain = queryExp._getRep().slice();
       var opImpl = null;
 
@@ -851,6 +998,8 @@
       opImpl = getBaseOpImpl( baseExp );
 
       return opImpl.then( evalSimpleExpChain( expChain ) )
+      */
+      return null;
     }
 
     return {

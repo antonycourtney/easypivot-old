@@ -100,8 +100,7 @@ function onQ1Result( res ) {
   start();
 }
 
-var q1 = relTab.query()
-          .table( "bart-comp-all" );
+var q1 = relTab.query.table( "bart-comp-all" );
 
 var rt = relTab.local();
 
@@ -113,6 +112,8 @@ asyncTest( "async test: simple table query", 5, function() {
 });
 
 var q2 = q1.project( [ "Job", "Title", "Union", "Name", "Base", "TCOE" ] );
+
+console.log( "q2: ", q2.toString() );
 
 function onQ2Result( res ) {
   console.log( "onQ2Result: ", res );
