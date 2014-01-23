@@ -210,74 +210,6 @@
     };   
   }
 
-/*
-  // constructor
-  function RelTabQueryExp( opRep ) {
-    var _expChain = inChain.slice(); // shallow copy inChain
-    if( opRep )
-      _expChain.push( opRep );
-
-    function opExpToString() {
-      var rs = this.operator + " ( " + JSON.stringify( this.args ) + " )";
-      return rs;
-    }
-
-
-    function mkTableRef( tableName ) {
-      return mkOperator( "table", tableName );
-    }
-
-    function mkFilterExp( fexp ) {
-      return mkOperator( "filter", fexp );
-    }
-
-    function mkProjectExp( cols ) {
-      return mkOperator( "project", cols );
-    }
-
-    function mkGroupBy( cols, aggs ) {
-      return mkOperator( "groupBy", cols, aggs );
-    }
-
-    function mkMapColumns( colMap ) {
-      return mkOperator( "mapColumns", colMap );
-    }
-    function mkMapColumnsByIndex( colMap ) {
-      return mkOperator( "mapColumnsByIndex", colMap );
-    }
-    function mkExtend( cols, colMetadata, colValues ) {
-      return mkOperator( "extend", cols, colMetadata, colValues );
-    }
-    function mkConcat( qexp ) {
-      return mkOperator( "concat", qexp );
-    }
-
-
-    function toString() {
-      var es = [];
-      for( var i = 0; i < _expChain.length; i++ ) {
-        var exp = _expChain[i];
-        es.push( exp.toString() );
-      }
-      return es.join(" >>> ");
-    }
-
-    function getRep() {
-      return _expChain;
-    }
-
-    return {
-      "_table": mkTableRef,
-      // "rowCount"
-      // "join"
-      // "sort"
-      // "extend": mkExtendExp,
-      // "crossTab"
-      "_getRep": getRep,
-    };
-  }
-*/
-
   // Create base of a query expression chain by starting with "table":
   function createTableQueryExp( tableName ) {
     var opRep = mkOpRep( "table", [ tableName ], [] );
@@ -866,35 +798,6 @@
       // "concat": concatImpl,
     }
 
-/*
-
-DEAD!
-
-    // given a chain of simple operators (TableData -> TableData functions), compose them in to a
-    // TableData -> TableData function 
-    function evalSimpleExpChain( expChain ) {
-      // map chain of expression ASTs into TableData -> TableData closures
-      var impChain = [];
-      for ( var i = 0; i < expChain.length; i++ ) {
-        var exp = expChain[ i ];
-        var opImpl = simpleOpImplMap[ exp.operator ];
-        var args = exp.args.slice();
-        var impFn = opImpl.apply( null, args ); // apply args and get back a TableData -> TableData fn
-        impChain.push( impFn );
-      }
-
-      function af( tableData ) {
-        var ret = tableData;
-        for ( var i = 0; i < impChain.length; i++ ) {
-          var opf = impChain[ i ];
-          ret = opf( ret );
-        }
-        return ret;
-      }
-
-      return af;
-    }
-*/
 
     /*
      * Evaluate a non-base expression from its sub-tables
