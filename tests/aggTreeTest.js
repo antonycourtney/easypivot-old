@@ -33,6 +33,12 @@ p0.then( function( tree0 ) {
   var q3 = tree0.applyPath( [ "Executive Management", "General Manager" ] );
   runQueryTest( q3, "query for path /Executive Management/General Manager " );
   
+
+  var openPaths = { "Executive Management": { "General Manager": true }, "Safety": true,  };
+
+  var q4 = tree0.getTreeQuery( openPaths );
+  runQueryTest( q4, "treeQuery" );
+
   // seems a bit odd that we have to call this explicitly, but...
   start();
 } );

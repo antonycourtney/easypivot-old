@@ -21,7 +21,7 @@ function columnSum( tableData, columnId ) {
  * format table as a string for debugging:
  */
 function fmtTableData( tbl, opts ) {
-  var maxRows = ( opts && opts.maxRows ) || 20;
+  var maxRows = ( opts && opts.maxRows ) || 50;
   var cellWidth = 16;
   var outStrs = [];
 
@@ -74,6 +74,10 @@ function fmtTableData( tbl, opts ) {
     var row = tbl.rowData[ i ];
     var cellStrs = row.map( cellFmt );
     outStrs.push( "| " + cellStrs.join( " | " ) + " |" );
+  }
+
+  if( nRows < tbl.rowData.length ) {
+    outStrs.push( " ...output truncated ( " + ( tbl.rowData.length - nRows ) + " additional rows )" );
   }
 
   return outStrs.join( "\n" );

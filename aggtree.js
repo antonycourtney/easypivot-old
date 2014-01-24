@@ -71,13 +71,47 @@
         // _childCount would count next level of groupBy, _leafCount would do count() at point of calculating
         // filter for current path (before doing groupBy).
         // These can certainly have non-trivial costs to calculate
+        // Probably also want to explicitly insert _path0..._pathN columns!
         return pathQuery;
       }
+
+      /*
+       * get query for full tree state from a set of openPaths
+       */
+      function getTreeQuery( openPaths ) {
+        var resQuery = this.rootQuery;
+        
+        function walkPath( pivotTree, treeQuery, prefix, pathMap ) {
+          for( component in pathMap ) {
+            if( pathMap.hasOwnProperty( component ) ) {
+              // add this component to our query:
+              var subPath = prefix.slice();
+              subPath.push( component );
+              console.log( "walkPath: " + JSON.stringify( subPath ) );
+              var subQuery = pivotTree.applyPath( subPath );
+              treeQuery = treeQuery.concat( subQuery );
+
+              // and recurse, if appropriate:
+              var cval = pathMap[ component ];
+              if( typeof cval == "object" ) {
+                  treeQuery = walkPath( pivotTree, treeQuery, subPath, cval );
+              }
+            }
+          }
+          return treeQuery;
+        }
+
+        if( openPaths ) {
+          resQuery = resQuery.concat( this.applyPath( [] ) );  // open root level!
+        }
+        return walkPath( this, resQuery, [], openPaths );
+      }  
 
       return { 
         // schema: resSchema,
         rootQuery: rootQuery,
-        applyPath: applyPath 
+        applyPath: applyPath,
+        getTreeQuery: getTreeQuery
       };
     }
 

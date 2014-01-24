@@ -902,6 +902,7 @@
      * identify common table subexpressions.
      */
     function buildCSEMap( cseMap, opRep ) {
+      if( typeof opRep == "undefined" ) debugger;
       var tableNums = opRep.tableArgs.map( function( e ) { return buildCSEMap( cseMap, e ); } );
       var expKey = opRep.operator + "( [ " + tableNums.toString() + " ], " + JSON.stringify( opRep.valArgs ) + " )";
       var valNum = cseMap.invMap[ expKey ];
