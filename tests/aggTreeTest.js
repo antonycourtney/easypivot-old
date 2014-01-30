@@ -34,7 +34,7 @@ p0.then( function( tree0 ) {
   runQueryTest( q3, "query for path /Executive Management/General Manager " );
   
 
-  var openPaths = { "Executive Management": { "General Manager": true }, "Safety": true,  };
+  var openPaths = { "Executive Management": { "General Manager": {} }, "Safety": {},  };
 
   var q4 = tree0.getTreeQuery( openPaths );
   runQueryTest( q4, "treeQuery" );
@@ -42,3 +42,16 @@ p0.then( function( tree0 ) {
   // seems a bit odd that we have to call this explicitly, but...
   start();
 } );
+
+var baseQuery = relTab.query.table( "bart-comp-all" )
+                  .project( [ "Job", "Title", "Union", "Name", "Base", "TCOE" ]);                      
+var ptm = EasyPivot.pivotTreeModel( rt, baseQuery, [ "Job", "Title" ] );
+
+console.log( "Created PivotTreeModel...." );
+
+function testLfn0( treeQuery ) {
+    console.log( "testLfn0 listener called.  treeQuery: ", treeQuery.toString(), treeQuery );
+    runQueryTest( treeQuery, "pivotTreeModel initial image" );
+}
+
+ptm.addListener( testLfn0 )

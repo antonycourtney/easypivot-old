@@ -34,7 +34,7 @@
 <script>
   $(function () {
     var rt = relTab.local();
-    var baseQuery = relTab.query().table( "${table_name}" )
+    var baseQuery = relTab.query().table( "bart-comp-all" )
                       .project( [ "Job", "Title", "Union", "Name", "Base", "TCOE" ]);                      
     var ptm = EasyPivot.pivotTreeModel( rt, baseQuery, [ "Job", "Title" ]  );
     var sgv = EasyPivot.SlickGrid.sgView( "#myGrid", ptm ); 
