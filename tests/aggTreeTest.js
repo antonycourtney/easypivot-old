@@ -54,4 +54,19 @@ function testLfn0( treeQuery ) {
     runQueryTest( treeQuery, "pivotTreeModel initial image" );
 }
 
-ptm.addListener( testLfn0 )
+function runPivotTreeTest( p, msg, nextFn ) {
+  function onPromiseResolved( treeQuery ) {
+    console.log( msg + " got promise result. query: ", treeQuery.toString(), treeQuery );
+    runQueryTest( treeQuery, msg );
+    if( nextFn )
+      nextFn();
+  }
+  p.then( onPromiseResolved );
+}
+
+
+var ptp = ptm.getCurrentImage();
+runPivotTreeTest( ptp, "Initial Image", function() {
+  var np = ptm.openPath( [] );
+  runPivotTreeTest( np, "After opening root node" );
+} );

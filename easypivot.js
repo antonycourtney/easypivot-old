@@ -22,7 +22,7 @@
     this.setPivots = function( inPivots ) {
       pivots = inPivots;
       needPivot = true;
-      updateTreeTable();
+      return updateTreeTable();
     }
 
     this.getPivots = function() { 
@@ -51,75 +51,41 @@
 
     this.openPath = function( path ) {
       addPath( path );
-      updateTreeTable();
+      return updateTreeTable();
     }
 
     this.closePath = function( path ) {
       removePath( path );
-      updateTreeTable();
+      return updateTreeTable();
     }
 
-    /*
-     * make a promise handler that will invoke the given listener function iff
-     * it hasn't been removed from listener list.
-     */
-    function mkPromiseHandler( lid, lfn ) {
-      function handler( treeQuery ) {
-        if( listeners[ lid ] )
-          return lfn( treeQuery );
-        return null;
-      }
-      return handler;
-    }
-
-
-    this.addListener = function( lfn ) {
-      /*
-       * TODO: We need to call treeQueryPromise.then() and add ourselves to listener list.
-       * But then they key is that whenever we re-assign treeQueryPromise (in updateTreeTable),
-       * we need to call then() to register all listeners on the new promise.
-       */
-
-      // What we really want here is to somehow call then() on whatever treeQueryPromise is.
-      // pre: treeQueryPromise !== null       
-      var lid = listeners.length;
-      listeners.push( lfn );
-      treeQueryPromise.then( mkPromiseHandler( lid, lfn ) );
-      return lid;
-    }
-
-    this.removeListener = function( lid ) {
-      delete listeners[ lid ];
-    }
 
     function updateTreeTable() {
-      if( treeQueryPromise ) {
-        // We reject any existing promise in case it is pending from some previous action.
-        // Note that this will be a NOP if the promise is already resolved.
         /*
-         * My basic plan here is to make PivotTreeModel as stateless and flexible as possible
-         * and then implement some kind of blocking in the UI so that, for example, opening a node blocks until
-         * that completes.  Probably need to expose some additional machinery for notifying the UI when some
-         * action is pending or completed...
-         */
-        treeQueryPromise.reject( "pending action cancelled by additional update" );
-      }
+         * ???  Open Design Question: Should we cancel any pending operation here??
+         *
+         * One way to do so would be to get our hands on the Q.defer() object and call .reject().
+         * But going to be a bit of work to set up the plumbing for that and that still doesn't address how 
+         * we actually propagate a true cancellation through RelTab so that it can actually send a cancellation
+         * if there is a remote server / thread doing the work.
+         *
+         */      
 
       if( needPivot ) {
         vpivotPromise = aggTree.vpivot( rt, baseQuery, pivots );
-
+        needPivot = false;
       };
 
-      treeQueryPromise = ptp.then( function( ptree ) {
+      treeQueryPromise = vpivotPromise.then( function( ptree ) {
         return ptree.getTreeQuery( openNodeMap );
       });
 
-      // and re-register all our listeners on new promise:
-      for( var i = 0; i < listeners.length; i++ ) {
-        var lfn = listeners[ i ];
-        if( lfn === undefined ) continue;
-        treeQueryPromise.then( mkPromiseHandler( lid, lfn ) );
-      }
+      return treeQueryPromise;
+    }
+
+    /* get promise<query> for the current state of the pivot table */
+    this.getCurrentImage = function() {
+      return treeQueryPromise;
     }
 
     updateTreeTable();
