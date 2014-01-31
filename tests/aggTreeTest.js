@@ -65,7 +65,7 @@ function runPivotTreeTest( p, msg, nextFn ) {
 }
 
 
-var ptp = ptm.getCurrentImage();
+var ptp = ptm.refresh();
 runPivotTreeTest( ptp, "Initial Image", function() {
   var np = ptm.openPath( [] );
   runPivotTreeTest( np, "After opening root node" );

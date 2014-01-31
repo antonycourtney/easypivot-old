@@ -19,10 +19,12 @@
     var vpivotPromise = null;
     var needPivot = true; // pivots have been set, need to call vpivot()
 
+    this.rt = rt;
+
     this.setPivots = function( inPivots ) {
       pivots = inPivots;
       needPivot = true;
-      return updateTreeTable();
+      return this.refresh();
     }
 
     this.getPivots = function() { 
@@ -51,16 +53,19 @@
 
     this.openPath = function( path ) {
       addPath( path );
-      return updateTreeTable();
+      return this.refresh();
     }
 
     this.closePath = function( path ) {
       removePath( path );
-      return updateTreeTable();
+      return this.refresh();
     }
 
-
-    function updateTreeTable() {
+    /*
+     * refresh the pivot tree based on current model state.
+     * returns: promise<query> for query that yields flattened view of the pivot tree.
+     */
+    this.refresh = function() {
         /*
          * ???  Open Design Question: Should we cancel any pending operation here??
          *
@@ -68,7 +73,6 @@
          * But going to be a bit of work to set up the plumbing for that and that still doesn't address how 
          * we actually propagate a true cancellation through RelTab so that it can actually send a cancellation
          * if there is a remote server / thread doing the work.
-         *
          */      
 
       if( needPivot ) {
@@ -83,12 +87,6 @@
       return treeQueryPromise;
     }
 
-    /* get promise<query> for the current state of the pivot table */
-    this.getCurrentImage = function() {
-      return treeQueryPromise;
-    }
-
-    updateTreeTable();
   }
 
   function mkPivotTreeModel( rt, baseQuery, initialPivots ) {
