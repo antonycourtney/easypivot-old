@@ -192,6 +192,10 @@
       return mkOperator( "concat", [], [ qexp._rep ] );
     }
 
+    function mkSort( keys ) {
+      return mkOperator( "sort", [ keys ] );
+    }
+
     function toString() {
       return opRep.toString();
     }
@@ -207,6 +211,7 @@
       "extend": mkExtend,
       "extendColumn": mkExtendColumn,
       "concat": mkConcat,
+      "sort": mkSort,
     };   
   }
 
@@ -238,7 +243,7 @@
     function Schema( schemaData ) {
       var s = schemaData;
 
-      s.getColumnType = function( colId ) {
+      s.columnType = function( colId ) {
         var md = s.columnMetadata[ colId ];
 
         return md.type;
@@ -527,6 +532,75 @@
 
       return ff;
     };
+
+    function compileSortFunc( schema, keys ) {
+      function strcmp( s1, s2 ) {
+        return (s1 < s2 ?  -1 : ( (s1 > s2) ? 1 : 0 ));
+      }
+
+      function intcmp( i1, i2 ) {
+        return (i2 - i1);
+      }
+
+      var cmpFnMap = {
+        "text": strcmp,
+        "integer": intcmp
+      };
+
+      function mkRowCompFn( valCmpFn, idx, nextFunc ) {
+        function rcf( rowa, rowb ) {
+          var va = rowa[idx];
+          var vb = rowb[idx];
+          var ret = valCmpFn( va, vb );
+          return ( ret==0 ? nextFunc( rowa, rowb ) : ret );
+        }
+
+        return rcf;
+      }
+
+      var rowCmpFn = function( rowa, rowb ) {
+        return 0;
+      }
+
+      function reverseArgs( cfn ) {
+        function rf( v1, v2 ) { return cfn( v2, v1 ); }
+
+        return rf;
+      }
+
+
+      for( var i = keys.length - 1; i >=0; i-- ) {
+        var colId = keys[i][0];
+        var asc = keys[i][1];
+        var idx = schema.columnIndex( colId );
+
+        // look up comparison func for values of specific column type (taking asc in to account):
+        var colType = schema.columnType( colId );
+        var valCmpFn = cmpFnMap[ colType ];
+/*        if( !asc ) {
+          valCmpFn = reverseArgs( valCmpFn );
+        }
+        */
+        rowCmpFn = mkRowCompFn( valCmpFn, idx, rowCmpFn );
+      }
+      return rowCmpFn;
+    }
+
+
+    function sortImpl( sortKeys ) {
+
+      function sf( subTables ) {
+        var tableData = subTables[ 0 ];
+
+        var rsf = compileSortFunc( tableData.schema, sortKeys );
+        // force a copy:
+        outRows = tableData.rowData.slice();
+        outRows.sort( rsf );
+
+        return { schema: tableData.schema, rowData: outRows };
+      }
+      return sf;
+    }
 
     // A simple op is a function from a full evaluated query result { schema, rowData } -> { schema, rowData }
     // This can easily be wrapped to make it async / promise-based / caching
@@ -843,6 +917,7 @@
       "mapColumnsByIndex": mapColumnsByIndexImpl,
       "extend": extendImpl,
       "concat": concatImpl,
+      "sort": sortImpl,
     }
 
 

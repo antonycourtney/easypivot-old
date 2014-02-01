@@ -17,13 +17,14 @@
     function withBaseRes( baseRes ) {
       var baseSchema = baseRes.schema;
 
-      var outCols = [ "_depth", "_pivot" ];
+      var outCols = [ "_depth", "_pivot", "_path" ];
       outCols = outCols.concat( baseSchema.columns );
 
       var rootQuery = rtBaseQuery
                     .groupBy( [], baseSchema.columns )
                     .extendColumn( "_pivot", { type: "text" }, null ) 
                     .extendColumn( "_depth", { type: "integer" }, 0 )
+                    .extendColumn( "_path", {type: "text"}, "" )
                     .project( outCols ); 
 
       /*
@@ -61,9 +62,15 @@
                         .extendColumn( "_pivot", { type: "text" }, null );
         }
 
-        // add _depth column and project to get get column order correct:
+        // add _depth and _path column and project to get get column order correct:
+
+        // TODO: Escape any embedded pipe chars in path!
+
+        var pathStr = path.join( "|" );
+
         pathQuery = pathQuery
                       .extendColumn( "_depth", { type: "integer" }, path.length + 1 )
+                      .extendColumn( "_path", { type: "text" }, pathStr )
                       .project( outCols ); 
 
 

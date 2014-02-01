@@ -70,7 +70,7 @@ function onQ1Result( res ) {
 
   for ( var i = 0; i < columns.length; i++ ) {
     var colId = columns[ i ];
-    var ct = schema.getColumnType( colId );
+    var ct = schema.columnType( colId );
     // console.log( "column '" + colId + "': type: " + ct );
     columnTypes.push( ct );
   }
@@ -197,3 +197,8 @@ runQueryTest( q7, "mapColumnsByIndex" );
 var q8 = q5.concat( q1.filter( relTab.and().eq("Job", "'Safety'") ) );
 runQueryTest( q8, "concat" );
 
+var q9 = q8.sort( [ [ "Name", true ] ] );
+runQueryTest( q9, "sort" );
+
+var q10 = q8.sort( [ [ "Job", true ], [ "TCOE", false ] ] );
+runQueryTest( q10, "multi key sort" );
