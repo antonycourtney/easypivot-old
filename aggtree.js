@@ -66,11 +66,13 @@
 
         // TODO: Escape any embedded pipe chars in path!
 
-        var pathStr = "|" + path.join( "|" );
+        var basePathStr = "|" + path.join( "|" );
+        var pathDelim = ( path.length > 0 ) ? "|" : "";
 
         pathQuery = pathQuery
                       .extendColumn( "_depth", { type: "integer" }, path.length + 1 )
-                      .extendColumn( "_path", { type: "text" }, pathStr )
+                      // .extendColumn( "_path", { type: "text" }, pathStr )
+                      .extendColumn( "_path", { type: "text" }, function( r ) { return basePathStr + pathDelim + r._pivot; } )
                       .project( outCols ); 
 
 

@@ -1,4 +1,5 @@
 (function ($) {
+  'use strict';
   $.extend(true,window, {
     relTab: {
       local: localRelTab,
@@ -144,8 +145,8 @@
      */
     function ppExp(exp) {
       var strs = [];
-      for( i = 0; i < exp.args.length; i++ ) {
-        subExp = exp.args[i];
+      for( var i = 0; i < exp.args.length; i++ ) {
+        var subExp = exp.args[i];
         var ppFunc = ppFuncs[ subExp.type ];
         strs.push( ppFunc( subExp ) );
       }
@@ -349,6 +350,19 @@
         // success!
       }
 
+      // Construct a row map with keys being column ids: 
+      s.rowMapFromRow = function( rowArray ) {
+        var columnIds = this.columns;
+
+        var rowMap = { };
+        for( var col = 0; col < rowArray.length; col++ ) {
+          rowMap[ columnIds[ col ] ] = rowArray[ col ];
+        }
+
+        return rowMap;
+      }
+
+
       return s;  // for now
     }
 
@@ -541,7 +555,7 @@
         var argCFs = argExps.map( compileSimpleExp );
 
         function cf( row ) {
-          for ( i = 0; i < argCFs.length; i++ ) {
+          for ( var i = 0; i < argCFs.length; i++ ) {
             var acf = argCFs[ i ];
             var ret = acf( row );
             if( !ret )
@@ -580,9 +594,9 @@
 
         var ce = compileFilterExp( tableData.schema, fexp );
 
-        outRows = [];
+        var outRows = [];
         for( var i = 0; i < tableData.rowData.length; i++ ) {
-          row = tableData.rowData[ i ];
+          var row = tableData.rowData[ i ];
           if( ce.evalFilterExp( row ) )
             outRows.push( row );
         }
@@ -637,10 +651,9 @@
         // look up comparison func for values of specific column type (taking asc in to account):
         var colType = schema.columnType( colId );
         var valCmpFn = cmpFnMap[ colType ];
-/*        if( !asc ) {
+        if( !asc ) {
           valCmpFn = reverseArgs( valCmpFn );
         }
-        */
         rowCmpFn = mkRowCompFn( valCmpFn, idx, rowCmpFn );
       }
       return rowCmpFn;
@@ -654,7 +667,7 @@
 
         var rsf = compileSortFunc( tableData.schema, sortKeys );
         // force a copy:
-        outRows = tableData.rowData.slice();
+        var outRows = tableData.rowData.slice();
         outRows.sort( rsf );
 
         return { schema: tableData.schema, rowData: outRows };
@@ -797,7 +810,7 @@
         }  
 
         // finalize!
-        rowData = [];
+        var rowData = [];
         for ( keyStr in groupMap ) {
           if ( groupMap.hasOwnProperty( keyStr ) ) {
             groupRow = groupMap[ keyStr ];
@@ -824,7 +837,7 @@
       // and that applying cmap will not violate any invariants on Schema....but need to nail down
       // exactly what those invariants are first!
 
-      function mc( tableData ) {
+      function mc( subTables ) {
         var tableData = subTables[ 0 ];
         var inSchema = tableData.schema;
 
@@ -906,9 +919,9 @@
     }
 
     /*
-     * extend a RelTab by adding a column with a constant value.
+     * extend a RelTab by adding a column computed from existing columns.
      */
-    function extendImpl( columns, columnMetadata, columnValues ) {
+    function extendImpl( columns, columnMetadata, columnValMap ) {
 
       /*
        * TODO: What are the semantics of doing an extend on a column that already exists?  Decide and spec. it!
@@ -924,16 +937,38 @@
         var extValues = [];
         for( var i = 0; i < columns.length; i++ ) {
           var colId = columns[ i ];
-          var val = columnValues && columnValues[ colId ];
+          var val = columnValMap && columnValMap[ colId ];
           if ( typeof val == "undefined" )
             val = null;
           extValues.push( val );
         }
 
+        /*
+         * For now we only allow extensions to depend on columns of the original
+         * table.  We may want to relax this to allow columns to depend on earlier
+         * entries in columns[] array.
+         */
         var outRows = [];
-        for( i = 0; i < tableData.rowData.length; i++ ) {
+        for( var i = 0; i < tableData.rowData.length; i++ ) {
           var inRow = tableData.rowData[ i ];
-          var outRow = inRow.concat( extValues );
+          var rowMap = null;  // only build on-demand
+          // TODO: For performance could cons up an object with getters that use schema to just do an array index
+          // For now, let's just build the row object:
+
+          var outRow = inRow.slice();
+          for( var j = 0; j < extValues.length; j++ ) {
+            var ev = extValues[ j ];
+            if( typeof( ev ) === "function" ) {
+              if( !rowMap ) {
+                rowMap = tableData.schema.rowMapFromRow( inRow );
+              }
+              var outVal = ev( rowMap );
+            } else {
+              // extending with a constant value:
+              var outVal = ev;
+            }
+            outRow.push( outVal );
+          }
           outRows.push( outRow );
         }
 
