@@ -6,6 +6,7 @@
       query: {
         table: createTableQueryExp
       },
+      parse: parseExp,
       // filter support:
       and: createFilterAndExp,
       or: createFilterOrExp,
@@ -14,6 +15,68 @@
     } 
   });
 
+  var expectedLambdaTemplate = {
+    "type": "Program",
+    "body": [
+    {
+      "type": "VariableDeclaration",
+      "declarations": [
+      {
+        "type": "VariableDeclarator",
+        "id": {
+          "type": "Identifier",
+          "name": "_it"
+        },
+        "init": {
+          "type": "FunctionExpression",
+          "id": null,
+          "params": [
+          {
+            "type": "Identifier",
+            "name": "*"
+          }
+          ],
+          "defaults": [],
+          "body": {
+            "type": "BlockStatement",
+            "body": [
+            {
+              "type": "ReturnStatement",
+              "argument": "*"
+            }
+            ]
+          },
+          "rest": null,
+          "generator": false,
+          "expression": false
+        }
+      }
+      ],
+      "kind": "var"
+    }
+    ]
+  };
+
+  /**
+   * match pattern against a template, throwing an exception if
+   * match fails
+   */
+  function matchPattern( val, tmpl ) {
+    // TODO!
+  }
+
+  /*
+   * This wrapper around esprima parser for parsing Lambda expressions
+   */
+  function parseExp( str, env ) {
+    var extStr = "var _it = " + str ;
+    
+    var parseRes = esprima.parse( extStr );
+    console.log( "parse: result: ", parseRes );
+    matchPattern( parseRes, expectedLambdaTemplate );
+    var ret = parseRes.body[0].declarations[0].init;
+    return ret;
+  }
   /**
    * Wrapper around d3.json using Q's Promises library:
    */
@@ -368,8 +431,6 @@
        * apply to each input row to produce the result of the project.
        */
       function calcState( inSchema ) {
-        console.log( "calcState" );
-
         var perm = calcProjectionPermutation( inSchema, projectCols );
         var ns = new Schema( { columns: projectCols, columnMetadata: inSchema.columnMetadata } );
 
@@ -516,7 +577,6 @@
     function filterImpl( fexp ) {
       function ff( subTables ) {
         var tableData = subTables[ 0 ];
-        console.log( "ff: ", fexp );
 
         var ce = compileFilterExp( tableData.schema, fexp );
 
@@ -690,8 +750,6 @@
       function gb( subTables ) {
         var tableData = subTables[ 0 ];
 
-        console.log( "gb: enter: cols.length ", cols.length );
-
         var inSchema = tableData.schema;
         var outSchema = calcSchema( inSchema );
 
@@ -727,7 +785,6 @@
           var groupRow = groupMap[ keyStr ];
           var aggAccs = undefined;
           if ( !groupRow ) {
-            // console.log( "Adding new group for key '" + keyStr + "'");
             aggAccs = mkAggAccs();
             // make an entry in our map:
             groupRow = keyData.concat( aggAccs );
@@ -751,8 +808,6 @@
             rowData.push( groupRow );
           }
         }
-
-        console.log( "gb: exit" );
         return { schema: outSchema, rowData: rowData };
       }
 

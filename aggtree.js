@@ -66,7 +66,7 @@
 
         // TODO: Escape any embedded pipe chars in path!
 
-        var pathStr = path.join( "|" );
+        var pathStr = "|" + path.join( "|" );
 
         pathQuery = pathQuery
                       .extendColumn( "_depth", { type: "integer" }, path.length + 1 )
@@ -111,7 +111,10 @@
         if( openPaths ) {
           resQuery = resQuery.concat( this.applyPath( [] ) );  // open root level!
         }
-        return walkPath( this, resQuery, [], openPaths );
+        var tq = walkPath( this, resQuery, [], openPaths );
+
+        tq = tq.sort( [ [ "_path", true ] ] );
+        return tq;
       }  
 
       return { 

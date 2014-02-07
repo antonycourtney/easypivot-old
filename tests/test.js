@@ -202,3 +202,6 @@ runQueryTest( q9, "sort" );
 
 var q10 = q8.sort( [ [ "Job", true ], [ "TCOE", false ] ] );
 runQueryTest( q10, "multi key sort" );
+
+var ptree = relTab.parse( "function (r) { return r > 99; } " );
+console.log( "result of relTab.parse: ", ptree );

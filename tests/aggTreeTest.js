@@ -17,7 +17,7 @@ p0.then( function( tree0 ) {
   var q1 = tree0.applyPath( [] );
   runQueryTest( q1, "applyPath( [] ) ", 3, function( res ) {
 
-    var expCols = [ "_depth", "_pivot", "Job", "Title", "Union", "Name", "Base", "TCOE"];
+    var expCols = [ "_depth", "_pivot", "_path", "Job", "Title", "Union", "Name", "Base", "TCOE"];
 
     deepEqual( res.schema.columns, expCols, "Q1 schema columns" );
     deepEqual( res.rowData.length, 19, "Q1 rowData length" );
