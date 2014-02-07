@@ -1,4 +1,5 @@
 (function ($) {
+  'use strict';
   $.extend( true, window, {
     aggTree: {
       vpivot: vpivotTree,
@@ -91,7 +92,7 @@
         var resQuery = this.rootQuery;
         
         function walkPath( pivotTree, treeQuery, prefix, pathMap ) {
-          for( component in pathMap ) {
+          for( var component in pathMap ) {
             if( pathMap.hasOwnProperty( component ) ) {
               // add this component to our query:
               var subPath = prefix.slice();
