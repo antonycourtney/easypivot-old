@@ -1,0 +1,50 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+  <title>EasyPivot - ${table_name}</title>
+  <link rel="stylesheet" href="SlickGrid/slick.grid.css" type="text/css"/>
+  <link rel="stylesheet" href="SlickGrid/css/smoothness/jquery-ui-1.8.16.custom.css" type="text/css"/>
+  <link rel="stylesheet" href="SlickGrid/examples/examples.css" type="text/css"/>
+  <link rel="stylesheet" href="pivotview.css" type="text/css"/>
+  <style>
+    body {
+      margin: 16px;
+      margin-top: 8px;
+    }
+  </style>
+</head>
+<body>
+<div style="width:100%;float:left;">
+  <div id="myGrid" style="width:100%;height:500px;"></div>
+</div>
+<script src="SlickGrid/lib/firebugx.js"></script>
+<script src="SlickGrid/lib/jquery-1.7.min.js"></script>
+<script src="SlickGrid/lib/jquery-ui-1.8.16.custom.min.js"></script>
+<script src="SlickGrid/lib/jquery.event.drag-2.2.js"></script>
+<script src="SlickGrid/lib/jquery.jsonp-2.4.min.js"></script>
+<script src="SlickGrid/slick.core.js"></script>
+<script src="SlickGrid/slick.grid.js"></script>
+<script src="http://d3js.org/d3.v3.min.js"></script>
+<script src="lib/q.js"></script>
+<script src="reltab.js"></script>
+<script src="aggtree.js"></script>
+<script src="easypivot.js"></script>
+<script src="epslick.js"></script>
+<script>
+  $(function () {
+    var rt = relTab.local();
+    var baseQuery = relTab.query.table( "bart-comp-all" )
+                      .project( [ "Job", "Title", "Union", "Name", "Base", "TCOE" ]);                      
+    var ptm = EasyPivot.pivotTreeModel( rt, baseQuery, [ "Union", "Job", "Title" ] );
+    ptm.openPath( [] );
+    ptm.openPath( [ "Non-Represented", "Audit" ] );
+    ptm.openPath( [ "Non-Represented", "Clerical" ] );
+    ptm.openPath( [ "Non-Represented", "Information Systems" ] );
+    ptm.openPath( [ "Non-Represented", "Information Systems", "Manager of Information Systems" ] );
+    var sgv = EasyPivot.SlickGrid.sgView( "#myGrid", ptm ); 
+    var sgc = EasyPivot.SlickGrid.sgController( sgv, ptm );      
+  });
+</script>
+</body>
+</html>

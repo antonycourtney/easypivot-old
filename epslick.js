@@ -3,7 +3,6 @@
   $.extend(true, window, {
     EasyPivot: {
       SlickGrid: {
-        pivotTreeLoader: mkPivotTreeLoader,
         sgView: mkSGView,
         sgController: mkSGController
       }
@@ -37,12 +36,7 @@
     };
   }
 
-  /***
-   * Local data loader that uses a PivotTreeModel to drive
-   * SlickGrid.  Main job is to convert is RelTab TableData
-   * and Schema to SlickGrid format.
-   */
-  function PivotTreeLoader( ptm ) {
+  function SGView( container, ptmodel ) {     
     // private
     var dataView = new SimpleDataView();
 
@@ -50,8 +44,16 @@
     var onDataLoading = new Slick.Event();
     var onDataLoaded = new Slick.Event();
 
-    function init() {
-    }
+
+    var grid;
+
+    var options = {
+      editable: false,
+      enableAddRow: false,
+      enableCellNavigation: false
+    };
+
+    var loadingIndicator = null;
 
     function isDataLoaded(from, to) {
       return true;  // TODO: should return false before receiving initial image...
@@ -61,64 +63,11 @@
       dataView.setItems([]);
     }
 
-
     function ensureData(from, to) {
       // TODO: Should probably check for initial image not yet loaded
       // onDataLoading.notify({from: from, to: to});
       onDataLoaded.notify({from: from, to: to});
     }
-
-    function loadInitialImage( cbfn ) {
-
-      function onGet( res ) {
-        console.log( "loadInitialImage: ", res );
-
-        // construct SlickGrid-style row data:
-        var columnIds = res.schema.columns;
-
-        rows = [];
-        for( var i = 0; i < res.rowData.length; i++ ) {
-          rowArray = res.rowData[ i ];
-          rowDict = { };
-          for( var col = 0; col < rowArray.length; col++ ) {
-            rowDict[ columnIds[ col ] ] = rowArray[ col ];
-          }
-          rows.push( rowDict );
-        }
-
-        dataView.setItems( rows );
-
-
-        // construct columnInfo:
-        firstRow = rows[0];
-
-        var names = Object.getOwnPropertyNames( firstRow );
-
-        var gridCols = [];
-        for (var i = 0; i < res.schema.columns.length; i++) {
-          var colId = res.schema.columns[ i ];
-          var cmd = res.schema.columnMetadata[ colId ];
-          var ci = { id: colId, field: colId };
-          var displayName = cmd.displayName || colId;
-          ci.name = displayName;
-          ci.toolTip = displayName;
-          gridCols.push( ci );
-        };
-        response = { columnInfo: gridCols, results: rows };
-        cbfn( response );
-      }
-
-      var rt = ptm.rt;
-
-      var pData = ptm.refresh()
-                  .then( function( treeQuery ) { return rt.evalQuery( treeQuery) } )
-                  .then( onGet );
-    }
-
-
-    function reloadData(from, to) {
-    }
-
 
     function setSort(column, dir) {
       sortcol = column;
@@ -134,56 +83,47 @@
       /* onDataLoaded.notify({from: 0, to: 50});  */
     }
 
-    init();
+    function onGridClick( e, args ) {
+      console.log( "onGridClick: ", e, args );
+      var item = this.getDataItem( args.row );
+      console.log( "data item: ", item );
+      if( item.isLeaf )
+        return;
+      var path = EasyPivot.parsePath( item._path );
+      if( item.isOpen ) {
+        ptmodel.closePath( path );
+      } else {
+        ptmodel.openPath( path);
+      }
 
-    return {
-      // properties
-      "data": dataView,
+      refreshFromModel();
+    }
 
-      // methods
-      "clear": clear,
-      "isDataLoaded": isDataLoaded,
-      "ensureData": ensureData,
-      // "reloadData": reloadData,
-      "setSort": setSort,
-      "loadInitialImage": loadInitialImage,
-
-      // events
-      "onDataLoading": onDataLoading,
-      "onDataLoaded": onDataLoaded
-    };
-  }
-
-
-  function SGView( container, loader ) {     
-    var grid;
-
-    var options = {
-      editable: false,
-      enableAddRow: false,
-      enableCellNavigation: false
-    };
-
-    var loadingIndicator = null;
 
     /* Create a grid from the specified set of columns */
-    function createGrid( columns ) 
+    function createGrid( columns, data ) 
     {
-      grid = new Slick.Grid(container, loader.data, columns, options);
+      grid = new Slick.Grid(container, data, columns, options);
 
       grid.onViewportChanged.subscribe(function (e, args) {
         var vp = grid.getViewport();
-        loader.ensureData(vp.top, vp.bottom);
+        ensureData(vp.top, vp.bottom);
       });
 
+/*
+ * TODO...kind of difficult!
+ *
       grid.onSort.subscribe(function (e, args) {
         grid.setSortColumn( args.sortCol.field, args.sortAsc );
-        loader.setSort(args.sortCol.field, args.sortAsc ? 1 : -1);
+        setSort(args.sortCol.field, args.sortAsc ? 1 : -1);
         var vp = grid.getViewport();
-        loader.ensureData(vp.top, vp.bottom);
+        ensureData(vp.top, vp.bottom);
       });
+*/
+      grid.onClick.subscribe( onGridClick );
 
-      loader.onDataLoading.subscribe(function () {
+
+      onDataLoading.subscribe(function () {
         if (!loadingIndicator) {
           loadingIndicator = $("<span class='loading-indicator'><label>Buffering...</label></span>").appendTo(document.body);
           var $g = $(container);
@@ -197,7 +137,7 @@
         loadingIndicator.show();
       });
 
-      loader.onDataLoaded.subscribe(function (e, args) {
+      onDataLoaded.subscribe(function (e, args) {
         for (var i = args.from; i <= args.to; i++) {
           grid.invalidateRow(i);
         }
@@ -218,14 +158,116 @@
       grid.onViewportChanged.notify();
     };
 
-    function onInitialImage( response ) {
+    // 
+    var _defaults = {
+      groupCssClass: "slick-group",
+      groupTitleCssClass: "slick-group-title",
+      totalsCssClass: "slick-group-totals",
+      groupFocusable: true,
+      totalsFocusable: false,
+      toggleCssClass: "slick-group-toggle",
+      toggleExpandedCssClass: "expanded",
+      toggleCollapsedCssClass: "collapsed",
+      enableExpandCollapse: true,
+      groupFormatter: defaultGroupCellFormatter,
+    };
+
+    // options = $.extend(true, {}, _defaults, options);
+    options = _defaults; // for now
+
+    function defaultGroupCellFormatter(row, cell, value, columnDef, item) {
+      if (!options.enableExpandCollapse) {
+        return item._pivot;
+      }
+
+      var indentation = item._depth * 15 + "px";
+
+      var pivotStr = item._pivot || "";
+
+      var ret = "<span class='" + options.toggleCssClass + " " +
+          ((!item.isLeaf ) ? ( item.isOpen ? options.toggleExpandedCssClass : options.toggleCollapsedCssClass ) : "" ) +
+          "' style='margin-left:" + indentation +"'>" +
+          "</span>" +
+          "<span class='" + options.groupTitleCssClass + "' level='" + item._depth + "'>" +
+            pivotStr +
+          "</span>";
+      return ret;
+    }
+
+    /*
+     * load tableData from ptModel in to DataView
+     */
+    function loadDataView( tableData ) {
+
+      var nPivots = ptmodel.getPivots().length;
+      var rowData = [];
+      for( var i = 0; i < tableData.rowData.length; i++ ) {
+        var rowMap = tableData.schema.rowMapFromRow( tableData.rowData[ i ] );
+        var path = EasyPivot.parsePath( rowMap._path );
+        rowMap.isOpen = ptmodel.pathIsOpen( path );
+        rowMap.isLeaf = rowMap._depth > nPivots;
+        rowData.push( rowMap );
+      }
+
+      dataView.setItems( rowData );
+
+      return rowData;
+    }
+
+    function loadDataAndRender( tableData ) {
+      loadDataView( tableData );
+
+      var ts = relTab.fmtTableData( tableData );
+      console.log( ts );
+
+      grid.invalidateAllRows(); // TODO: optimize
+      grid.updateRowCount();
+      grid.render();      
+    };
+
+    function refreshFromModel() {
+      ptmodel.refresh()
+              .then( function( treeQuery ) { return rt.evalQuery( treeQuery) } )
+              .then( loadDataAndRender );
+    }
+
+
+    function onInitialImage( tableData ) {
+      console.log( "loadInitialImage: ", tableData );
+
+      // construct SlickGrid-style row data:
+      var columnIds = tableData.schema.columns;
+
+
+      var rowData = loadDataView( tableData );
+
+      // construct columnInfo:
+      firstRow = rowData[0];
+
+      var names = Object.getOwnPropertyNames( firstRow );
+
+      var gridCols = [];
+      for (var i = 0; i < tableData.schema.columns.length; i++) {
+        var colId = tableData.schema.columns[ i ];
+       /* if ( colId[0] == "_" ) {
+          if( colId !== "_pivot")
+            continue;
+        }
+        */
+        var cmd = tableData.schema.columnMetadata[ colId ];
+        var ci = { id: colId, field: colId };
+        var displayName = cmd.displayName || colId;
+        ci.name = displayName;
+        ci.toolTip = displayName;
+        gridCols.push( ci );
+      };
+
       // let's approximate the column width:
       var MINCOLWIDTH = 80;
       var MAXCOLWIDTH = 300;
       var GRIDWIDTHPAD = 16;
       var gridWidth = 0;  // initial padding amount
       var colWidths = {};
-      var rowData = response.results;
       for ( var i = 0; i < rowData.length; i++ ) {
         var row = rowData[ i ];
         var cnm;
@@ -239,8 +281,12 @@
           }
         }
       }
-      var ci = response.columnInfo;
+      var ci = gridCols;
       for (var i = 0; i < ci.length; i++) {
+        if( ci[i].id === "_pivot" ) {
+          ci[i].name = "";
+          ci[i].formatter = options.groupFormatter;
+        }
         ci[i].toolTip = ci[i].name;
         ci[i].sortable = true;
         ci[i].width = colWidths[ ci[i].field ];
@@ -251,28 +297,29 @@
         // console.log( "column ", i, " name: '", ci[i].name, "', width: ", ci[i].width );
         gridWidth += ci[i].width;
       }
-      createGrid( ci );
+      createGrid( ci, dataView );
 
       $(container).css( 'width', gridWidth+'px' );
     };
  
-    loader.loadInitialImage( onInitialImage );
+    var rt = ptmodel.rt;
+
+    var pData = ptmodel.refresh()
+                .then( function( treeQuery ) { return rt.evalQuery( treeQuery) } )
+                .then( onInitialImage );
   }
 
-  function mkPivotTreeLoader( ptmodel ) {
-    return new PivotTreeLoader( ptmodel );
+
+  function mkSGView( div, ptmodel ) {
+    return new SGView( div, ptmodel );
   }
 
-  function mkSGView( div, ptloader ) {
-    return new SGView( div, ptloader );
-  }
-
-  function SGController( sgview, ptloader ) {
+  function SGController( sgview, ptmodel ) {
     // TODO
   }
 
-  function mkSGController( sgview, ptloader ) {
-    return new SGController( sgview, ptloader );
+  function mkSGController( sgview, ptmodel ) {
+    return new SGController( sgview, ptmodel );
   }
 
 
