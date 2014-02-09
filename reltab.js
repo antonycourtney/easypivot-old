@@ -986,7 +986,7 @@
       function cf( subTables ) {
         var tbl = subTables[ 0 ];
         var res = { schema: tbl.schema, rowData: tbl.rowData };
-        for ( i = 1; i < subTables.length; i++ ) {
+        for ( var i = 1; i < subTables.length; i++ ) {
           tbl = subTables[ i ];
           // check schema compatibility:
           res.schema.compatCheck( tbl.schema );
@@ -1164,7 +1164,7 @@ function fmtTableData( tbl, opts ) {
 
   var nRows = d3.min( [ maxRows, tbl.rowData.length ] );
 
-  for( i = 0 ; i < nRows; i++ ) {
+  for( var i = 0 ; i < nRows; i++ ) {
     var row = tbl.rowData[ i ];
     var cellStrs = row.map( cellFmt );
     outStrs.push( "| " + cellStrs.join( " | " ) + " |" );

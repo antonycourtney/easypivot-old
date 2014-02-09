@@ -1,5 +1,6 @@
 // functions and objects for connection EasyPivot model to SlickGrid
 (function ($) {
+  'use strict';
   $.extend(true, window, {
     EasyPivot: {
       SlickGrid: {
@@ -242,7 +243,7 @@
       var rowData = loadDataView( tableData );
 
       // construct columnInfo:
-      firstRow = rowData[0];
+      var firstRow = rowData[0];
 
       var names = Object.getOwnPropertyNames( firstRow );
 

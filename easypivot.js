@@ -1,4 +1,5 @@
 (function ($) {
+  'use strict';
   $.extend(true, window, {
     EasyPivot: {
       pivotTreeModel: mkPivotTreeModel,

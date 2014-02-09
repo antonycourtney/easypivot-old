@@ -97,7 +97,6 @@
               // add this component to our query:
               var subPath = prefix.slice();
               subPath.push( component );
-              console.log( "walkPath: " + JSON.stringify( subPath ) );
               var subQuery = pivotTree.applyPath( subPath );
               treeQuery = treeQuery.concat( subQuery );
 
