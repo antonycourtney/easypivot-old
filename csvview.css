@@ -23,3 +23,7 @@
   padding-left: 20px;
   background: url('SlickGrid/images/ajax-loader-small.gif') no-repeat center left;
 }
+
+.pivot-column {
+  background: white;
+}

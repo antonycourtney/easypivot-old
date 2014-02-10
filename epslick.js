@@ -187,6 +187,7 @@
 
       var ret = "<span class='" + options.toggleCssClass + " " +
           ((!item.isLeaf ) ? ( item.isOpen ? options.toggleExpandedCssClass : options.toggleCollapsedCssClass ) : "" ) +
+/*          " pivot-column" + */
           "' style='margin-left:" + indentation +"'>" +
           "</span>" +
           "<span class='" + options.groupTitleCssClass + "' level='" + item._depth + "'>" +
@@ -250,16 +251,18 @@
       var gridCols = [];
       for (var i = 0; i < tableData.schema.columns.length; i++) {
         var colId = tableData.schema.columns[ i ];
-       /* if ( colId[0] == "_" ) {
+        if ( colId[0] == "_" ) {
           if( colId !== "_pivot")
             continue;
         }
-        */
         var cmd = tableData.schema.columnMetadata[ colId ];
         var ci = { id: colId, field: colId };
         var displayName = cmd.displayName || colId;
         ci.name = displayName;
         ci.toolTip = displayName;
+        if( colId == "_pivot" ) {
+          ci.cssClass = "pivot-column";
+        }
         gridCols.push( ci );
       };
 
