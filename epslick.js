@@ -12,6 +12,8 @@
 
   function SimpleDataView() {
     var rawData = [];
+    var idMap = [];
+    var sortCmpFn = null;
 
     function getLength() {
       return rawData.length;
@@ -21,8 +23,24 @@
       return rawData[index];
     }
 
+    function getItemById(id) {
+      return idMap[id];
+    }
+
     function setItems( items ) {
       rawData = items;
+      idMap = items.slice();
+      updateView();
+    }
+
+    function setSort( cmpFn ) {
+      sortCmpFn = cmpFn;
+      updateView();
+    }
+
+    function updateView() {
+      if( sortCmpFn )
+        sort( sortCmpFn );
     }
 
     function sort( cmpFn ) {
@@ -33,7 +51,8 @@
       "getLength": getLength,
       "getItem": getItem,
       "setItems": setItems,
-      "sort": sort,
+      "setSort": setSort,
+      "getItemById": getItemById,
     };
   }
 
@@ -70,19 +89,6 @@
       onDataLoaded.notify({from: from, to: to});
     }
 
-    function setSort(column, dir) {
-      sortcol = column;
-      sortdir = dir;
-
-      var orderFn = ( dir > 0 ) ? d3.ascending : d3.descending;
-   
-      function cmpFn( ra, rb ) {
-        return orderFn( ra[ sortcol ], rb[ sortcol ]);
-      }
-
-      dataView.sort( cmpFn );
-      /* onDataLoaded.notify({from: 0, to: 50});  */
-    }
 
     function onGridClick( e, args ) {
       console.log( "onGridClick: ", e, args );
@@ -100,6 +106,53 @@
       refreshFromModel();
     }
 
+    // recursively get ancestor of specified row at the given depth:
+    function getAncestor( row, depth ) {
+      if( depth > row._depth ) {
+        throw new Error( "getAncestor: depth " + depth + " > row.depth of " 
+                         + row._depth + " at row " + row._id );
+      }
+      while ( depth < row._depth ) {
+        row = dataView.getItemById( row._parentId );
+      };
+      return row;
+    }
+
+    function setSort(column, dir) {
+      var sortcol = column;
+      var sortdir = dir;
+
+      var orderFn = ( dir > 0 ) ? d3.ascending : d3.descending;
+  
+      function cmpFn( ra, rb ) {
+        var idA = ra._id;
+        var idB = rb._id;
+
+        if( ra._depth==0 || rb._depth==0 )
+          return (ra._depth - rb._depth); // 0 always wins
+
+        if( ra._depth < rb._depth ) {
+          // get ancestor of rb at depth ra._depth:
+          rb = getAncestor( rb, ra._depth );
+          if( rb._id == ra._id ) {
+            // ra is itself an ancedstor of rb, so comes first:
+            return -1;
+          }
+        } else if( ra._depth > rb._depth ) {
+          ra = getAncestor( ra, rb._depth );
+          if( ra._id == rb._id ) {
+            // rb is itself an ancestor of ra, so must come first:
+            return 1;
+          }
+        }
+
+        var ret = orderFn( ra[ sortcol ], rb[ sortcol ]);
+        return ret;
+      }
+
+      dataView.setSort( cmpFn );
+      //onDataLoaded.notify({from: 0, to: 50});
+    }
 
     /* Create a grid from the specified set of columns */
     function createGrid( columns, data ) 
@@ -111,18 +164,15 @@
         ensureData(vp.top, vp.bottom);
       });
 
-/*
- * TODO...kind of difficult!
- *
       grid.onSort.subscribe(function (e, args) {
         grid.setSortColumn( args.sortCol.field, args.sortAsc );
         setSort(args.sortCol.field, args.sortAsc ? 1 : -1);
         var vp = grid.getViewport();
         ensureData(vp.top, vp.bottom);
       });
-*/
-      grid.onClick.subscribe( onGridClick );
 
+
+      grid.onClick.subscribe( onGridClick );
 
       onDataLoading.subscribe(function () {
         if (!loadingIndicator) {
@@ -203,11 +253,17 @@
 
       var nPivots = ptmodel.getPivots().length;
       var rowData = [];
+      var parentIdStack = [];
       for( var i = 0; i < tableData.rowData.length; i++ ) {
         var rowMap = tableData.schema.rowMapFromRow( tableData.rowData[ i ] );
         var path = EasyPivot.parsePath( rowMap._path );
+        var depth = rowMap._depth;
         rowMap.isOpen = ptmodel.pathIsOpen( path );
-        rowMap.isLeaf = rowMap._depth > nPivots;
+        rowMap.isLeaf = depth > nPivots;
+        rowMap._id = i;
+        parentIdStack[ depth ] = i;
+        var parentId = ( depth > 0 ) ? parentIdStack[ depth - 1 ] : null;
+        rowMap._parentId = parentId;
         rowData.push( rowMap );
       }
 
@@ -220,7 +276,6 @@
       loadDataView( tableData );
 
       var ts = relTab.fmtTableData( tableData );
-      console.log( ts );
 
       grid.invalidateAllRows(); // TODO: optimize
       grid.updateRowCount();
@@ -229,7 +284,7 @@
 
     function refreshFromModel() {
       ptmodel.refresh()
-              .then( function( treeQuery ) { return rt.evalQuery( treeQuery) } )
+              .then( function( treeQuery ) { return rt.evalQuery( treeQuery ); } )
               .then( loadDataAndRender );
     }
 
@@ -237,9 +292,10 @@
     function onInitialImage( tableData ) {
       console.log( "loadInitialImage: ", tableData );
 
+      var showHiddenColumns = false;  // Useful for debugging.  TODO: make configurable!
+
       // construct SlickGrid-style row data:
       var columnIds = tableData.schema.columns;
-
 
       var rowData = loadDataView( tableData );
 
@@ -249,11 +305,17 @@
       var names = Object.getOwnPropertyNames( firstRow );
 
       var gridCols = [];
+      if ( showHiddenColumns ) {
+        gridCols.push( { id: "_id", field: "_id", name: "_id" } );
+        gridCols.push( { id: "_parentId", field: "_parentId", name: "_parentId" } );
+      }
       for (var i = 0; i < tableData.schema.columns.length; i++) {
         var colId = tableData.schema.columns[ i ];
-        if ( colId[0] == "_" ) {
-          if( colId !== "_pivot")
-            continue;
+        if ( !showHiddenColumns ) {
+          if ( colId[0] == "_" ) {
+            if( colId !== "_pivot")
+              continue;
+          }
         }
         var cmd = tableData.schema.columnMetadata[ colId ];
         var ci = { id: colId, field: colId };
@@ -266,6 +328,7 @@
         gridCols.push( ci );
       };
 
+
       // let's approximate the column width:
       var MINCOLWIDTH = 80;
       var MAXCOLWIDTH = 300;
@@ -277,12 +340,12 @@
         var cnm;
         for ( cnm in row ) {
           var cellVal = row[ cnm ];
+          var cellWidth = MINCOLWIDTH;
           if( cellVal ) {
-            colWidths[ cnm ] = Math.min( MAXCOLWIDTH,
-                Math.max( colWidths[ cnm ] || MINCOLWIDTH, 8 + ( 6 * cellVal.toString().length ) ) );
-          } else {
-            colWidths[ cnm ] = MINCOLWIDTH;
+            cellWidth = 8 + ( 6 * cellVal.toString().length );  // TODO: measure!
           }
+          colWidths[ cnm ] = Math.min( MAXCOLWIDTH,
+              Math.max( colWidths[ cnm ] || MINCOLWIDTH, cellWidth ) );
         }
       }
       var ci = gridCols;
@@ -298,7 +361,7 @@
           // pad out last column to allow for dynamic scrollbar
           ci[i].width += GRIDWIDTHPAD;
         }
-        // console.log( "column ", i, " name: '", ci[i].name, "', width: ", ci[i].width );
+        console.log( "column ", i, "id: ", ci[i].id, ", name: '", ci[i].name, "', width: ", ci[i].width );
         gridWidth += ci[i].width;
       }
       createGrid( ci, dataView );
@@ -309,10 +372,9 @@
     var rt = ptmodel.rt;
 
     var pData = ptmodel.refresh()
-                .then( function( treeQuery ) { return rt.evalQuery( treeQuery) } )
+                .then( function( treeQuery ) { return rt.evalQuery( treeQuery); } )
                 .then( onInitialImage );
   }
-
 
   function mkSGView( div, ptmodel ) {
     return new SGView( div, ptmodel );

@@ -59,4 +59,45 @@ What's the connection between Signals / Streams and Promises ??
    Each of these answers suck.  There must be a better way.  The challenge here is that, on the one hand, we want to be able to see asychrony and have laziness, but on the other hand we don't want too much "magic" that makes it difficult to reason
    about what's happening.
 
+==================
+
+Dealing with sorting in the pivot tree:
+
+The right comparison is:
+
+  cmp( r1, r2 ) {
+    if( r1._depth==r2._depth ) {
+      return cmp( r1[sortcol],r2[sortcol] );
+    } else {
+      cdepth = min( r1.depth, r2.depth );
+      pr1 = parent( r1, cdepth );
+      pr2 = parent( r2, cdepth );
+      // Note: Either pr1==r1 or pr2==r2
+      if( pr1==r2) 
+        return -1; // pr1 ancestor-of r2
+      if( pr2==r1) // pr2 ancestor-of r1
+      return cmp( pr1, pr2 );
+    }
+  }
+
+Either we need each row to keep track of its parents and have a way to efficiently get to a parent row,
+OR
+we need to each row to keep the values carried from all parents of sort keys
+
+We probably just want to do the dynamic parent row lookup.
+For better performance we could add _parent0, _parent1, ... columns to allow O(1) instead of O(log depth) lookup of parent id.  But the O(log depth) just won't be that expensive.
+
+Now we need row ids, explicit _parent ids and efficient find() operation.
+...and we're adding yet more functionality to the row store impl.
+...and this has non-trivial architectural implications: We can't easily auto-generate row IDs in SQL; we may be able to do this on a case-by-case basis depending using proprietary extensions in some cases, but probably still need a fallback of doing this locally.  And that doesn't even address parent links at all.
+
+Also not clear where / how to insert this in the query pipeline. So far we pass in a Query to the UI and work with that directly.
+
+OK, we have something working....
+
+But:  Right now we're doing this in epslick.  Yuck!  Sorting absolutely, positively does NOT belong in view code.  TODO: move to model.
+
+
+
+
 

@@ -1085,7 +1085,6 @@
       return valNum;
     }
 
-
     function evalQuery( queryExp ) {
       // use value numbering to build up a map of common subexpression and then evaluate that
       var cseMap = { invMap: {}, valExps: [], promises: [] };
@@ -1094,10 +1093,6 @@
       console.log( "evalQuery after buildCSEMap: queryIdent: ", queryIdent, ", map: ", cseMap );
 
       return evalCSEMap( cseMap, queryIdent );
-
-      var opRep = cseMap.valExps[ queryIdent ];  
-
-      return null;
     }
 
     return {
