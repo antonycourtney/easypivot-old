@@ -229,7 +229,7 @@
       return columnInfo;
     }
 
-    function onInitialImage( dataView ) {
+    function loadInitialImage( dataView ) {
       console.log( "loadInitialImage: ", dataView );
 
       var showHiddenColumns = false;  // Useful for debugging.  TODO: make configurable!
@@ -243,7 +243,7 @@
  
     var rt = ptmodel.rt;
     var pData = ptmodel.refresh()
-                .then( onInitialImage );
+                .then( loadInitialImage );
   }
 
   function mkSGView( div, ptmodel ) {
