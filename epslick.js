@@ -156,49 +156,12 @@
       ptmodel.refresh().then( refreshGrid );
     }
 
-    function onInitialImage( dataView ) {
-      console.log( "loadInitialImage: ", dataView );
 
-      var showHiddenColumns = false;  // Useful for debugging.  TODO: make configurable!
-
-      // construct SlickGrid-style row data:
-      var columnIds = dataView.schema.columns;
-
-      // construct columnInfo:
-      var firstRow = dataView.getItem( 0 );
-
-      var names = Object.getOwnPropertyNames( firstRow );
-
-      var gridCols = [];
-      if ( showHiddenColumns ) {
-        gridCols.push( { id: "_id", field: "_id", name: "_id" } );
-        gridCols.push( { id: "_parentId", field: "_parentId", name: "_parentId" } );
-      }
-      for (var i = 0; i < dataView.schema.columns.length; i++) {
-        var colId = dataView.schema.columns[ i ];
-        if ( !showHiddenColumns ) {
-          if ( colId[0] == "_" ) {
-            if( colId !== "_pivot")
-              continue;
-          }
-        }
-        var cmd = dataView.schema.columnMetadata[ colId ];
-        var ci = { id: colId, field: colId };
-        var displayName = cmd.displayName || colId;
-        ci.name = displayName;
-        ci.toolTip = displayName;
-        if( colId == "_pivot" ) {
-          ci.cssClass = "pivot-column";
-        }
-        gridCols.push( ci );
-      };
-
-
+    // scan table data to make best effort at initial column widths
+    function getInitialColWidths( dataView ) {
       // let's approximate the column width:
       var MINCOLWIDTH = 80;
       var MAXCOLWIDTH = 300;
-      var GRIDWIDTHPAD = 16;
-      var gridWidth = 0;  // initial padding amount
       var colWidths = {};
       var nRows = dataView.getLength();
       for ( var i = 0; i < nRows; i++ ) {
@@ -214,28 +177,67 @@
               Math.max( colWidths[ cnm ] || MINCOLWIDTH, cellWidth ) );
         }
       }
-      var ci = gridCols;
-      for (var i = 0; i < ci.length; i++) {
-        if( ci[i].id === "_pivot" ) {
-          ci[i].name = "";
-          ci[i].formatter = options.groupFormatter;
-        }
-        ci[i].toolTip = ci[i].name;
-        ci[i].sortable = true;
-        ci[i].width = colWidths[ ci[i].field ];
-        if( i==ci.length - 1 ) {
-          // pad out last column to allow for dynamic scrollbar
-          ci[i].width += GRIDWIDTHPAD;
-        }
-        console.log( "column ", i, "id: ", ci[i].id, ", name: '", ci[i].name, "', width: ", ci[i].width );
-        gridWidth += ci[i].width;
-      }
 
-//      var columnInfo = createCols( tableData );
-      var columnInfo = { gridCols: ci, gridWidth: gridWidth };
+      return colWidths;
+    }
+
+    // construct SlickGrid column info from RelTab schema:
+    function mkGridCols( schema, colWidths, showHiddenColumns ) {
+
+      var columnIds = schema.columns;
+      var gridWidth = 0;  // initial padding amount
+      var GRIDWIDTHPAD = 16;
+
+      var gridCols = [];
+      if ( showHiddenColumns ) {
+        gridCols.push( { id: "_id", field: "_id", name: "_id" } );
+        gridCols.push( { id: "_parentId", field: "_parentId", name: "_parentId" } );
+      }
+      for (var i = 0; i < schema.columns.length; i++) {
+        var colId = schema.columns[ i ];
+        if ( !showHiddenColumns ) {
+          if ( colId[0] == "_" ) {
+            if( colId !== "_pivot")
+              continue;
+          }
+        }
+        var cmd = schema.columnMetadata[ colId ];
+        var ci = { id: colId, field: colId };
+        if( colId == "_pivot" ) {
+          ci.cssClass = "pivot-column";
+          ci.name = "";
+          ci.formatter = options.groupFormatter;
+        } else {
+          var displayName = cmd.displayName || colId;
+          ci.name = displayName;
+          ci.toolTip = displayName;
+          ci.sortable = true;
+        };
+        ci.width = colWidths[ ci.field ];
+        if( i==schema.columns.length - 1 ) {
+          // pad out last column to allow for dynamic scrollbar
+          ci.width += GRIDWIDTHPAD;
+        }
+        console.log( "column ", i, "id: ", ci.id, ", name: '", ci.name, "', width: ", ci.width );
+        gridWidth += ci.width;
+
+        gridCols.push( ci );
+      };
+
+      var columnInfo = { gridCols: gridCols, gridWidth: gridWidth };
+
+      return columnInfo;
+    }
+
+    function onInitialImage( dataView ) {
+      console.log( "loadInitialImage: ", dataView );
+
+      var showHiddenColumns = false;  // Useful for debugging.  TODO: make configurable!
+
+      var colWidths = getInitialColWidths( dataView ); 
+      var columnInfo = mkGridCols( dataView.schema, colWidths, showHiddenColumns );
 
       createGrid( columnInfo.gridCols, dataView );
-
       $(container).css( 'width', columnInfo.gridWidth+'px' );
     };
  
