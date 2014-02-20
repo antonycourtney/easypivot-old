@@ -65,10 +65,13 @@
 
         // add _depth and _path column and project to get get column order correct:
 
-        // TODO: Escape any embedded pipe chars in path!
+        // TODO: Escape any embedded PATHSEP chars in path!
+        // Note: We should just be able to map PATHSEP char to some other character, since _path is
+        // just used internally to maintain sort order of parents and children.
 
-        var basePathStr = "|" + path.join( "|" );
-        var pathDelim = ( path.length > 0 ) ? "|" : "";
+        var PATHSEP = ":";
+        var basePathStr = PATHSEP + path.join( PATHSEP );
+        var pathDelim = ( path.length > 0 ) ? PATHSEP : "";
 
         pathQuery = pathQuery
                       .extendColumn( "_depth", { type: "integer" }, path.length + 1 )

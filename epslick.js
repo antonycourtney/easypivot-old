@@ -17,6 +17,8 @@
 
     var grid;
 
+    var gridColumnInfo = null;
+
     var options = {
       editable: false,
       enableAddRow: false,
@@ -24,6 +26,8 @@
     };
 
     var loadingIndicator = null;
+
+    console.log( "Creating SGView.  Initial container width: ", $(container).width() );
 
     function ensureData(from, to) {
       // TODO: Should probably check for initial image not yet loaded
@@ -99,10 +103,12 @@
 
       registerLoadHandlers( grid );
 
-      /*$(window).resize(function () {
+      $(window).resize(function () {
+          console.log(" window.resize...." );
+          var w = $(container).width();
+          console.log( "container width: ", w );
           grid.resizeCanvas();
       });
-      */
 
       // load the first page
       grid.onViewportChanged.notify();
@@ -137,7 +143,6 @@
       var ret = "<span class='" + options.toggleCssClass + " " +
           ((!item.isLeaf ) ? ( item.isOpen ? options.toggleExpandedCssClass : 
                                              options.toggleCollapsedCssClass ) : "" ) +
-/*          " pivot-column" + */
           "' style='margin-left:" + indentation +"'>" +
           "</span>" +
           "<span class='" + options.groupTitleCssClass + "' level='" + item._depth + "'>" +
@@ -213,18 +218,19 @@
           ci.toolTip = displayName;
           ci.sortable = true;
         };
-        ci.width = colWidths[ ci.field ];
+        var colWidth = colWidths[ ci.field ];
         if( i==schema.columns.length - 1 ) {
           // pad out last column to allow for dynamic scrollbar
-          ci.width += GRIDWIDTHPAD;
+          colWidth += GRIDWIDTHPAD;
         }
-        console.log( "column ", i, "id: ", ci.id, ", name: '", ci.name, "', width: ", ci.width );
-        gridWidth += ci.width;
+        console.log( "column ", i, "id: ", ci.id, ", name: '", ci.name, "', width: ", colWidth );
+        ci.width = colWidth;
+        gridWidth += colWidth;
 
         gridCols.push( ci );
       };
 
-      var columnInfo = { gridCols: gridCols, gridWidth: gridWidth };
+      var columnInfo = { gridCols: gridCols, contentColWidths: colWidths, gridWidth: gridWidth };
 
       return columnInfo;
     }
@@ -235,10 +241,12 @@
       var showHiddenColumns = false;  // Useful for debugging.  TODO: make configurable!
 
       var colWidths = getInitialColWidths( dataView ); 
-      var columnInfo = mkGridCols( dataView.schema, colWidths, showHiddenColumns );
+      gridColumnInfo = mkGridCols( dataView.schema, colWidths, showHiddenColumns );
 
-      createGrid( columnInfo.gridCols, dataView );
-      $(container).css( 'width', columnInfo.gridWidth+'px' );
+      createGrid( gridColumnInfo.gridCols, dataView );
+      // console.log( "loadInitialImage: setting container width to: ", gridColumnInfo.gridWidth );
+      $(container).css( 'width', gridColumnInfo.gridWidth+'px' );
+      grid.resizeCanvas();
     };
  
     var rt = ptmodel.rt;
