@@ -12,7 +12,7 @@
    */
  function parsePath( pathStr ) {
     pathStr = pathStr.slice(1);
-    var path = (pathStr.length > 0 ) ? pathStr.split('|') : [];
+    var path = (pathStr.length > 0 ) ? pathStr.split( aggTree.PATHSEP ) : [];
     return path;
  }
 
@@ -142,6 +142,9 @@
     }
 
     this.loadDataView = function( tableData ) {
+      // var ts = relTab.fmtTableData( tableData );
+      // console.log( "loadDataView:\n", ts );
+
       var nPivots = pivots.length;
       var rowData = [];
       var parentIdStack = [];

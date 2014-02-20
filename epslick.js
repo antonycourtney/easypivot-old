@@ -223,7 +223,7 @@
           // pad out last column to allow for dynamic scrollbar
           colWidth += GRIDWIDTHPAD;
         }
-        console.log( "column ", i, "id: ", ci.id, ", name: '", ci.name, "', width: ", colWidth );
+        // console.log( "column ", i, "id: ", ci.id, ", name: '", ci.name, "', width: ", colWidth );
         ci.width = colWidth;
         gridWidth += colWidth;
 
@@ -236,7 +236,7 @@
     }
 
     function loadInitialImage( dataView ) {
-      console.log( "loadInitialImage: ", dataView );
+      // console.log( "loadInitialImage: ", dataView );
 
       var showHiddenColumns = false;  // Useful for debugging.  TODO: make configurable!
 

@@ -1,11 +1,14 @@
 (function ($) {
   'use strict';
+
+  var PATHSEP=':';
+
   $.extend( true, window, {
     aggTree: {
       vpivot: vpivotTree,
+      PATHSEP: PATHSEP,
     }
   });
-
 
   function vpivotTree( rt, rtBaseQuery, pivotColumns ) {
 
@@ -65,11 +68,10 @@
 
         // add _depth and _path column and project to get get column order correct:
 
-        // TODO: Escape any embedded PATHSEP chars in path!
-        // Note: We should just be able to map PATHSEP char to some other character, since _path is
-        // just used internally to maintain sort order of parents and children.
+        // TODO: Escape any embedded PATHSEP chars in path!  We should provide a pair of functions,
+        // joinPath, and parsePath such that parsePath(joinPath(pa))==pa and 
+        // joinPath(parsePath(ps))==ps
 
-        var PATHSEP = ":";
         var basePathStr = PATHSEP + path.join( PATHSEP );
         var pathDelim = ( path.length > 0 ) ? PATHSEP : "";
 
