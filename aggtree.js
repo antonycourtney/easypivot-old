@@ -1,14 +1,29 @@
 (function ($) {
   'use strict';
 
-  var PATHSEP=':';
+  var PATHSEP='#';  // Note: must come before '%' in ASCII for correct sort order
 
   $.extend( true, window, {
     aggTree: {
       vpivot: vpivotTree,
-      PATHSEP: PATHSEP,
+      encodePath: encodePath,
+      decodePath: decodePath,
     }
   });
+
+  function encodePath( path ) {
+    var eps = path.map( encodeURIComponent );
+    var ret = PATHSEP + eps.join( PATHSEP );
+
+    return ret;
+  };
+
+  function decodePath( pathStr ) {
+    pathStr = pathStr.slice(1); // drop leading PATHSEP
+    var eps = (pathStr.length > 0 ) ? pathStr.split( PATHSEP ) : [];
+    var path = eps.map( decodeURIComponent );
+    return path;
+  }
 
   function vpivotTree( rt, rtBaseQuery, pivotColumns ) {
 
@@ -68,17 +83,19 @@
 
         // add _depth and _path column and project to get get column order correct:
 
-        // TODO: Escape any embedded PATHSEP chars in path!  We should provide a pair of functions,
-        // joinPath, and parsePath such that parsePath(joinPath(pa))==pa and 
-        // joinPath(parsePath(ps))==ps
-
-        var basePathStr = PATHSEP + path.join( PATHSEP );
+        var basePathStr = encodePath( path ); 
         var pathDelim = ( path.length > 0 ) ? PATHSEP : "";
+
+        // TODO (major!): use of encodeURIComponent() in function of extendColumn() below means
+        // we most likely can't run this function directly in the database.
+        // Either need to arrange to support this in the db server (best) or find a way to
+        // do some local post-processing on results we get back from the db
 
         pathQuery = pathQuery
                       .extendColumn( "_depth", { type: "integer" }, path.length + 1 )
                       // .extendColumn( "_path", { type: "text" }, pathStr )
-                      .extendColumn( "_path", { type: "text" }, function( r ) { return basePathStr + pathDelim + r._pivot; } )
+                      .extendColumn( "_path", { type: "text" }, 
+                        function( r ) { return basePathStr + pathDelim + encodeURIComponent( r._pivot ); } )
                       .project( outCols ); 
 
 

@@ -42,7 +42,7 @@
       console.log( "data item: ", item );
       if( item.isLeaf )
         return;
-      var path = EasyPivot.parsePath( item._path );
+      var path = aggTree.decodePath( item._path );
       if( item.isOpen ) {
         ptmodel.closePath( path );
       } else {
@@ -238,7 +238,7 @@
     function loadInitialImage( dataView ) {
       // console.log( "loadInitialImage: ", dataView );
 
-      var showHiddenColumns = true;  // Useful for debugging.  TODO: make configurable!
+      var showHiddenColumns = false;  // Useful for debugging.  TODO: make configurable!
 
       var colWidths = getInitialColWidths( dataView ); 
       gridColumnInfo = mkGridCols( dataView.schema, colWidths, showHiddenColumns );

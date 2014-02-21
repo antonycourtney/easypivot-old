@@ -3,18 +3,8 @@
   $.extend(true, window, {
     EasyPivot: {
       pivotTreeModel: mkPivotTreeModel,
-      parsePath: parsePath,
     }
   });
-
-  /***
-   * split a pipe-delimited path string into its components
-   */
- function parsePath( pathStr ) {
-    pathStr = pathStr.slice(1);
-    var path = (pathStr.length > 0 ) ? pathStr.split( aggTree.PATHSEP ) : [];
-    return path;
- }
 
   function SimpleDataView() {
     var rawData = [];
@@ -150,7 +140,7 @@
       var parentIdStack = [];
       for( var i = 0; i < tableData.rowData.length; i++ ) {
         var rowMap = tableData.schema.rowMapFromRow( tableData.rowData[ i ] );
-        var path = EasyPivot.parsePath( rowMap._path );
+        var path = aggTree.decodePath( rowMap._path );
         var depth = rowMap._depth;
         rowMap.isOpen = this.pathIsOpen( path );
         rowMap.isLeaf = depth > nPivots;
