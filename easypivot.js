@@ -227,7 +227,7 @@
           // get ancestor of rb at depth ra._depth:
           rb = getAncestor( rb, ra._depth );
           if( rb._id == ra._id ) {
-            // ra is itself an ancedstor of rb, so comes first:
+            // ra is itself an ancestor of rb, so comes first:
             return -1;
           }
         } else if( ra._depth > rb._depth ) {
@@ -236,6 +236,18 @@
             // rb is itself an ancestor of ra, so must come first:
             return 1;
           }
+        }
+
+        // ra and rb at same depth, but do they have the same parent??
+        while ( ra._parentId !== rb._parentId ) {
+          // walk up tree until we find a common parent
+
+          /*
+          console.log( "looking for common ancestor of ra: id:", ra._id, ", parent: ", ra._parentId, ", depth: ", ra._depth, 
+                        " and rb: id: ", rb._id, ", parent: ", rb._parentId, ", depth: ", rb._depth );
+          */
+          ra = getAncestor( ra, ra._depth - 1 );
+          rb = getAncestor( rb, rb._depth - 1 );
         }
 
         var ret = orderFn( ra[ sortcol ], rb[ sortcol ]);

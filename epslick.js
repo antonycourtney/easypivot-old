@@ -238,7 +238,7 @@
     function loadInitialImage( dataView ) {
       // console.log( "loadInitialImage: ", dataView );
 
-      var showHiddenColumns = false;  // Useful for debugging.  TODO: make configurable!
+      var showHiddenColumns = true;  // Useful for debugging.  TODO: make configurable!
 
       var colWidths = getInitialColWidths( dataView ); 
       gridColumnInfo = mkGridCols( dataView.schema, colWidths, showHiddenColumns );
