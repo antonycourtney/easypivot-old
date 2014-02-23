@@ -27,6 +27,9 @@
 
   function vpivotTree( rt, rtBaseQuery, pivotColumns ) {
 
+    // add a count column:
+    rtBaseQuery = rtBaseQuery.extendColumn( "Rec", { type: "integer" }, 1 );
+
     // obtain schema for base query:
     // TODO:  Don't want to evaluate entire query just to get schema!
     // Need to change interface of RelTab to return a true TableDataSource that has calculated
