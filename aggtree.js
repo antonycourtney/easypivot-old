@@ -34,13 +34,18 @@
     var basep = rt.evalQuery( rtBaseQuery );
 
     function withBaseRes( baseRes ) {
+      // var recCountQuery = rtBaseQuery.extendColumn( "Rec", { type: "integer" }, 1 );
+
       var baseSchema = baseRes.schema;
 
       var outCols = [ "_depth", "_pivot", "_path" ];
       outCols = outCols.concat( baseSchema.columns );
 
+      var gbCols = baseSchema.columns.slice();
+      // gbCols.push( "Rec" );
+
       var rootQuery = rtBaseQuery
-                    .groupBy( [], baseSchema.columns )
+                    .groupBy( [], gbCols )
                     .extendColumn( "_pivot", { type: "text" }, null ) 
                     .extendColumn( "_depth", { type: "integer" }, 0 )
                     .extendColumn( "_path", {type: "text"}, "" )
@@ -54,7 +59,7 @@
         // and cache result for efficiency
 
         // queries are immutable so no need to clone:
-        var pathQuery = rtBaseQuery;
+        var pathQuery = rtBaseQuery; // recCountQuery;
 
         // We will filter by all path components, and then group by the next pivot Column:
         if ( path.length > pivotColumns.length ) {

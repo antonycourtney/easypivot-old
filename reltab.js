@@ -429,7 +429,7 @@
       for ( var i = 0 ; i < projectCols.length; i++ ) {
         var colId = projectCols[ i ];
         if( !( inSchema.columnMetadata[ colId ] ) ) {
-          err = new Error( "project: unknown column Id '" + colId + "'" );
+          var err = new Error( "project: unknown column Id '" + colId + "'" );
           throw err;
         }
         perm.push( inSchema.columnIndex( colId ) );

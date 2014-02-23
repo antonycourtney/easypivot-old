@@ -55,18 +55,21 @@ function testLfn0( treeQuery ) {
 }
 
 function runPivotTreeTest( p, msg, nextFn ) {
-  function onPromiseResolved( treeQuery ) {
-    console.log( msg + " got promise result. query: ", treeQuery.toString(), treeQuery );
-    runQueryTest( treeQuery, msg );
+  function onPromiseResolved( dataView ) {
+    console.log( msg + " got promise result: ", dataView ); 
+    for ( var i = 0; i < dataView.getLength(); i++ ) {
+      var rowItem = dataView.getItem( i );
+      console.log( rowItem );
+    }
     if( nextFn )
       nextFn();
   }
   p.then( onPromiseResolved );
 }
 
-
 var ptp = ptm.refresh();
 runPivotTreeTest( ptp, "Initial Image", function() {
-  var np = ptm.openPath( [] );
+  ptm.openPath( [] );
+  var np = ptm.refresh();
   runPivotTreeTest( np, "After opening root node" );
 } );
