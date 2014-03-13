@@ -16,5 +16,5 @@ In the directory where you've cloned this repository, do:
 
 and then open [localhost:8000/eptest.html](http://localhost:8000/eptest.html) in a web browser.  You should see an interactive pivot table of the BART Salary data. It may be informative to look at the console log output to see what's going on, particularly the reltab queries that are generated in response to interactive events on the pivot tree (opening and closing nodes).
 
-Another place to look are the tests: [localhost:8000/tests/test.html] and [localhost:8000/tests/aggTreeTest.html].
+Another place to look are the tests: [tests/test.html](http://localhost:8000/tests/test.html) and [tests/aggTreeTest.html](http://localhost:8000/tests/aggTreeTest.html).
 They aren't as assertive as they should be yet, but looking at the code should give some idea of the reltab and aggTree APIs.
