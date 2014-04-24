@@ -12,7 +12,11 @@ Internally easypivot uses a layered architecture to communicate with data source
 
 In the directory where you've cloned this repository, do:
 
-   $ python -m SimpleHTTPServer
+```sh
+$ git submodule init
+$ git submodule update
+$ python -m SimpleHTTPServer
+```
 
 and then open [localhost:8000/eptest.html](http://localhost:8000/eptest.html) in a web browser.  You should see an interactive pivot table of the BART Salary data. It may be informative to look at the console log output to see what's going on, particularly the reltab queries that are generated in response to interactive events on the pivot tree (opening and closing nodes).  You can also view source on eptest.html to see how the pivot table is
 set up and configured.
