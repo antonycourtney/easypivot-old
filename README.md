@@ -1,5 +1,7 @@
 # easypivot
 
+[ Note: This repository is incomplete and not under active development. ]
+
 ## Overview
 
 easypivot is a general purpose pivot table with a web-based UI.
