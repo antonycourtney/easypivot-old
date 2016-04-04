@@ -1,0 +1,197 @@
+/*
+  // TODO: Maybe query result should be some kind of generator or stream instead
+  // of [[]]
+  function onQueryResult( res ) {
+    console.log( "onQueryResult: ", res );
+    console.log( "result length: ", res.length );
+    equal( res.length, 2873, "q1 results length");
+
+    console.log( res[0]);
+
+    var expRow0 = ["Crunican, Grace", "General Manager", 312461, 0, 3846, 19141, 37513,
+      17500, 1869, 7591, 399921, "MNP", "Executive Management", "Non-Represented"];
+
+    deepEqual( res[0], expRow0, "q1 row 0 " );
+
+    start();
+  }
+
+  asyncTest( "asyncTest: evalQuery q1", 2, function() {
+    var p = rt.evalQuery( q1, onQueryResult );
+
+    p.then( onQueryResult, mkAsyncErrHandler( "evalQuery q1" ) );
+  });
+
+
+    // Given a standard TableData -> TableData operator, wrap it in a Promise:
+    function promiseWrap( inImpl, opfn ) {
+      var sp = null;
+
+      var outData = null;
+
+      function getSP() {
+        if( !sp ) {
+          var schemaP = inImpl.getSchema();
+          var dataP = inImpl.evalQuery();
+          sp = Q.all( [ schemaP, dataP ] ).spread( function( schema, rowData ) {
+            console.log( "spread fn: ", schema, rowData );
+            return opfn( { schema: schema, rowData: rowData } );
+          } );
+        }
+
+        return sp;
+      }
+
+      function getSchema() {
+        return getSP().then( function( tableData ) { return tableData.schema; } );
+      }
+
+      function evalQuery() {
+        return getSP().then( function( tableData ) { return tableData.rowData; } );
+      }
+
+      return {
+        "args": arguments,
+        "getSchema": getSchema,
+        "evalQuery": evalQuery
+      };
+    }
+
+    function groupByWrap( inImpl, cols, aggs ) {
+      var opfn = groupByImpl( cols, aggs );
+      return promiseWrap( inImpl, opfn );
+    }
+
+
+
+  var q3 = q1.groupBy( [ "Job", "Title" ], [ "TCOE" ] );  // note: [ "TCOE" ] equivalent to [ [ "sum", "TCOE" ] ]
+
+  function onQ3GetSchema( rs ) {
+    console.log( "onQ3getSchema", rs );
+
+    var expCols = [ "Job", "Title", "TCOE" ];
+    deepEqual( rs.columns, expCols, "q3 GetSchema" );
+
+    start();
+  }
+
+  var q3i = rt.evalQuery( q3 );
+
+  asyncTest( "asyncTest: getSchema q3", 1, function() {
+    var p = q3i.getSchema( q3 );
+
+    p.then( onQ3GetSchema );
+  } );
+
+  function onQ3Result( res ) {
+    console.log( "onQ3result:", res );
+
+    ok( true, "onQ3result called" );
+
+    start();
+  }
+
+  asyncTest( "asyncTest: evalQuery q3", 1, function() {
+    var p = q3i.evalQuery( q3 );
+
+    p.then( onQ3Result );
+  } );
+
+});
+
+test( "next test", function() {
+ ok( true, "Another Test!");
+});
+
+*/
+
+/*
+  function AggTreeQueryExp( inChain, opRep ) {
+    var _expChain = inChain.slice();  // shallow copy inChain
+    if ( opRep )
+      _expChain.push( opRep );
+
+    function opExpToString() {
+      var rs = this.operator + " ( " + this.args.toString() + " )";
+      return rs;
+    }
+
+    // variadic function to make an operator applied to args node in AST
+    function mkOperator(opName)
+    {
+      var args = Array.prototype.slice.call(arguments);
+      args.shift();
+      var opRep = { operator:opName, args:args, toString: opExpToString };
+      var e = new AggTreeQueryExp( _expChain, opRep );
+      return e;
+    }
+
+    function mkRelTabRef( relTabQuery ) {
+      return mkOperator( "reltab", relTabQuery );
+    }
+
+    function mkVPivot( pivotColumns ) {
+      return mkOperator( "vpivot", pivotColumns );
+    }
+
+    return {
+      "reltab": mkRelTabRef,
+      "vpivot": mkVPivot,
+      "toString": toString,
+      "_getRep": function() { return _expChain; }
+    }
+  }
+
+  function createQueryExp( rtq ) {
+    var base = new AggTreeQueryExp( [] );
+    return base.reltab( rtq );
+  }
+*/
+
+
+    /*
+     * make a promise handler that will invoke the given listener function iff
+     * it hasn't been removed from listener list.
+     */
+    function mkPromiseHandler( lid, lfn ) {
+      function handler( treeQuery ) {
+        if( listeners[ lid ] )
+          return lfn( treeQuery );
+        return null;
+      }
+      return handler;
+    }
+
+
+    this.addListener = function( lfn ) {
+      /*
+       * TODO: We need to call treeQueryPromise.then() and add ourselves to listener list.
+       * But then they key is that whenever we re-assign treeQueryPromise (in updateTreeTable),
+       * we need to call then() to register all listeners on the new promise.
+       */
+
+      // What we really want here is to somehow call then() on whatever treeQueryPromise is.
+      // pre: treeQueryPromise !== null       
+      var lid = listeners.length;
+      listeners.push( lfn );
+      treeQueryPromise.then( mkPromiseHandler( lid, lfn ) );
+      return lid;
+    }
+
+    this.removeListener = function( lid ) {
+      delete listeners[ lid ];
+    }
+
+/*
+      // and re-register all our listeners on new promise:
+      for( var i = 0; i < listeners.length; i++ ) {
+        var lfn = listeners[ i ];
+        if( lfn === undefined ) continue;
+        treeQueryPromise.then( mkPromiseHandler( lid, lfn ) );
+      }
+*/
+    /* get promise<query> for the current state of the pivot table */
+    this.getCurrentImage = function() {
+      return treeQueryPromise;
+    }
+
